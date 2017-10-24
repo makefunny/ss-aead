@@ -111,8 +111,6 @@ class DbTransfer(object):
             cur.close()
 
             bandwidth_thistime = bandwidth_thistime + \
-                ((dt_transfer[id][0] + dt_transfer[id][1]) * self.traffic_rate)
-            real_bandwidth_thistime = bandwidth_thistime + \
                 (dt_transfer[id][0] + dt_transfer[id][1])
 
             if query_sub_in is not None:
@@ -132,7 +130,7 @@ class DbTransfer(object):
         cur = conn.cursor()
         cur.execute(
             "UPDATE `ss_node` SET `node_heartbeat`=unix_timestamp(),`node_bandwidth`=`node_bandwidth`+'" +
-            str(real_bandwidth_thistime) +
+            str(bandwidth_thistime) +
             "' WHERE `id` = " +
             str(
                 get_config().NODE_ID) +
