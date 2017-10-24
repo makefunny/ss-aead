@@ -1,8 +1,9 @@
 For python3.6
-### Install
+### Deploy
 git clone https://github.com/max2max/ss-aead shadowsocks<br />
-cd shadowsocks && chmod +x ./*.sh<br />
+chmod +x ./shadowsocks/*.sh<br />
 <br />
+cd shadowsocks<br />
 ./run.sh<br />
 ./logrun.sh<br />
 ./stop.sh<br />
