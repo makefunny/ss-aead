@@ -33,6 +33,7 @@ import server_pool
 import db_transfer
 import web_transfer
 import speedtest_thread
+import nettest_thread
 import auto_thread
 import auto_block
 from shadowsocks import shell
@@ -67,6 +68,9 @@ def main():
     threadSpeedtest = MainThread(speedtest_thread.Speedtest)
     threadSpeedtest.start()
 
+    threadNettest = MainThread(nettest_thread.Nettest)
+    threadNettest.start()
+
     threadAutoexec = MainThread(auto_thread.AutoExec)
     threadAutoexec.start()
 
@@ -82,6 +86,8 @@ def main():
         threadMain.stop()
         if threadSpeedtest.is_alive():
             threadSpeedtest.stop()
+        if threadNettest.is_alive():
+            threadNettest.stop()
         if threadAutoexec.is_alive():
             threadAutoexec.stop()
         if threadAutoblock.is_alive():
