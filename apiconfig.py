@@ -1,6 +1,10 @@
-﻿# Config
+# Config
 NODE_ID = nodeid
 
+# net upload、download & ping log
+# and the unit is minute
+
+NETTEST = 1
 
 # hour,set 0 to disable
 SPEEDTEST = 0
