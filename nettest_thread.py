@@ -80,7 +80,7 @@ class Nettest(object):
             laytency = subprocess.Popen(["ping -c 1 " + ip + ' | grep "time="'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
             try:
                 stdout, stderr = laytency.communicate(timeout=2)
-                stdout = str(stdout).split("=")[3].rstrip("\n").replace(" ","")
+                stdout = str(stdout).split("=")[3].replace(" ","").replace("\\n","")
                 return stdout
             except subprocess.TimeoutExpired as e:
                 laytency.kill()
