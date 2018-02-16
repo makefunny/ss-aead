@@ -8,6 +8,7 @@ import os
 import psutil
 import configloader
 import importloader
+import cymysql
 from shadowsocks import common, shell
 
 class Nettest(object):
@@ -18,10 +19,32 @@ class Nettest(object):
         self.has_stopped = False
 
     def nettest_thread(self):
-        if self.event.wait(600):
+        if self.event.wait(1):
             return
 
         logging.info("Nettest starting...You can't stop right now!")
+
+        if configloader.get_config().MYSQL_SSL_ENABLE == 1:
+            conn = cymysql.connect(
+                host=configloader.get_config().MYSQL_HOST,
+                port=configloader.get_config().MYSQL_PORT,
+                user=configloader.get_config().MYSQL_USER,
+                passwd=configloader.get_config().MYSQL_PASS,
+                db=configloader.get_config().MYSQL_DB,
+                charset='utf8',
+                ssl={
+                    'ca': configloader.get_config().MYSQL_SSL_CA,
+                    'cert': configloader.get_config().MYSQL_SSL_CERT,
+                    'key': configloader.get_config().MYSQL_SSL_KEY})
+        else:
+            conn = cymysql.connect(
+                host=configloader.get_config().MYSQL_HOST,
+                port=configloader.get_config().MYSQL_PORT,
+                user=configloader.get_config().MYSQL_USER,
+                passwd=configloader.get_config().MYSQL_PASS,
+                db=configloader.get_config().MYSQL_DB,
+                charset='utf8')
+        conn.autocommit(True)
 
         def speed():
             rx0 = 0; tx0 = 0; rx1 = 0; tx1 = 0
@@ -41,46 +64,37 @@ class Nettest(object):
             speed1.append(tx1 - tx0)
             return speed1
 
-        if configloader.get_config().API_INTERFACE == 'modwebapi':
-            webapi.postApi('func/speedtest',
-                                 {'node_id': configloader.get_config().NODE_ID},
-                                 {'data': [{'telecomping': CTPing,
-                                            'telecomeupload': CTUpSpeed,
-                                            'telecomedownload': CTDLSpeed,
-                                            'unicomping': CUPing,
-                                            'unicomupload': CUUpSpeed,
-                                            'unicomdownload': CUDLSpeed,
-                                            'cmccping': CMPing,
-                                            'cmccupload': CMUpSpeed,
-                                            'cmccdownload': CMDLSpeed}]})
-        else:
-            import cymysql
-            if configloader.get_config().MYSQL_SSL_ENABLE == 1:
-                conn = cymysql.connect(
-                    host=configloader.get_config().MYSQL_HOST,
-                    port=configloader.get_config().MYSQL_PORT,
-                    user=configloader.get_config().MYSQL_USER,
-                    passwd=configloader.get_config().MYSQL_PASS,
-                    db=configloader.get_config().MYSQL_DB,
-                    charset='utf8',
-                    ssl={
-                        'ca': configloader.get_config().MYSQL_SSL_CA,
-                        'cert': configloader.get_config().MYSQL_SSL_CERT,
-                        'key': configloader.get_config().MYSQL_SSL_KEY})
-            else:
-                conn = cymysql.connect(
-                    host=configloader.get_config().MYSQL_HOST,
-                    port=configloader.get_config().MYSQL_PORT,
-                    user=configloader.get_config().MYSQL_USER,
-                    passwd=configloader.get_config().MYSQL_PASS,
-                    db=configloader.get_config().MYSQL_DB,
-                    charset='utf8')
-            conn.autocommit(True)
+        def list2str(n):
+            testlist = ""
+            i = 0
+            for r in n:
+                if i == 0:
+                    testlist = str(r)
+                elif i <= len(n):
+                    testlist += " " + str(r)
+                i += 1
+            return testlist
+
+        def getmyping(ip):
+            laytency = os.popen('ping -c 1 ' + ip + '|grep "time="').read()
+            laytency = laytency.split("=")[3].rstrip("\n").replace(" ","")
+            return laytency
+
+        def getpinglist():
             cur = conn.cursor()
-            cur.execute("INSERT INTO `ss_node_net_info` (`id`, `node_id`, `up`, `dl`, `log_time`) VALUES (NULL, '" +
-                    str(configloader.get_config().NODE_ID) + "', '" + str(speed()[0]) + "', '" + str(speed()[1]) + "', unix_timestamp()); ")
+            cur.execute("SELECT `id`,`ip` FROM `test_ip` where `ip` != ''")
+            n=[]
+            for r in cur.fetchall():
+                r = list(r)
+                n.append(r[0])
+                n.append(getmyping(r[1]))
             cur.close()
-            conn.close()
+            return n
+
+        cur = conn.cursor()
+        cur.execute("INSERT INTO `ss_node_net_info` (`id`, `node_id`, `up`, `dl`, `ping`, `log_time`) VALUES (NULL, '" + str(configloader.get_config().NODE_ID) + "', '" + str(speed()[0]) + "', '" + str(speed()[1]) + "', '" + list2str(getpinglist()) + "', unix_timestamp()); ")
+        cur.close()
+        conn.close()
 
         logging.info("Nettest finished")
 
