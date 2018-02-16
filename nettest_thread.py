@@ -9,6 +9,7 @@ import psutil
 import configloader
 import importloader
 import cymysql
+import subprocess
 from shadowsocks import common, shell
 
 class Nettest(object):
@@ -75,10 +76,15 @@ class Nettest(object):
                 i += 1
             return testlist
 
-        def getmyping(ip):
-            laytency = os.popen('ping -c 1 ' + ip + '|grep "time="').read()
-            laytency = laytency.split("=")[3].rstrip("\n").replace(" ","")
-            return laytency
+        def getping(ip):
+            laytency = subprocess.Popen(["ping -c 1 " + ip + ' | grep "time="'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
+            try:
+                stdout, stderr = laytency.communicate(timeout=2)
+                stdout = str(stdout).split("=")[3].rstrip("\n").replace(" ","")
+                return stdout
+            except subprocess.TimeoutExpired as e:
+                laytency.kill()
+                return "timeout"
 
         def getpinglist():
             cur = conn.cursor()
