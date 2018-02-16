@@ -1,9 +1,16 @@
 For python3.6
 ### Deploy
-git clone https://github.com/max2max/ss-aead shadowsocks<br />
-chmod +x ./shadowsocks/*.sh<br />
-<br />
-cd shadowsocks<br />
-./run.sh<br />
-./logrun.sh<br />
-./stop.sh<br />
+```bash
+git clone https://github.com/max2max/ss-aead shadowsocks
+chmod +x ./shadowsocks/*.sh
+
+cd shadowsocks
+./run.sh
+./logrun.sh
+./stop.sh
+
+# 监控需要psutil模块
+pip3.6 install psutil
+# mysql连接需要cymysql模块
+pip3.6 install cymysql
+```bash
