@@ -76,7 +76,7 @@ class Nettest(object):
                 i += 1
             return testlist
 
-        def getping(ip):
+        def getmyping(ip):
             laytency = subprocess.Popen(["ping -c 1 " + ip + ' | grep "time="'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
             try:
                 stdout, stderr = laytency.communicate(timeout=2)
