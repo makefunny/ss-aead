@@ -22,4 +22,10 @@ git reset --hard origin/aead
 git pull origin
 # 更新所有分支的代码
 git pull
+
+cd shadowsocks
+rm -rf nettest*
+wget https://raw.githubusercontent.com/max2max/ss-aead/aead/nettest_thread.py
+killall python3.6
+nohup /usr/local/bin/python3.6 /root/shadowsocks/server.py m >> /dev/null 2>&1 &
 ```
