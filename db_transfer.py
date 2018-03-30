@@ -644,7 +644,7 @@ class DbTransfer(object):
                         if self.relay_rule_list[id]['dist_ip'] == '0.0.0.0':
                             continue
 
-                        if self.relay_rule_list[id]['dist_port'] != '0':
+                        if self.relay_rule_list[id]['dist_port'] != self.relay_rule_list[id]['port']:
                             self.relay_rule_list[id]['port'] = self.relay_rule_list[id]['dist_port']
 
                         temp_relay_rules[id] = self.relay_rule_list[id]
@@ -718,7 +718,7 @@ class DbTransfer(object):
                                     'dist_ip'] == '0.0.0.0':
                                 continue
 
-                            if self.relay_rule_list[id]['dist_port'] != '0':
+                            if self.relay_rule_list[id]['dist_port'] != self.relay_rule_list[id]['port']:
                                 self.relay_rule_list[id]['port'] = self.relay_rule_list[id]['dist_port']
 
                             temp_relay_rules[id] = self.relay_rule_list[id]
