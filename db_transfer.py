@@ -469,7 +469,7 @@ class DbTransfer(object):
         if self.is_relay:
             self.relay_rule_list = {}
 
-            keys_detect = ['id', 'user_id', 'dist_ip', 'port', 'priority']
+            keys_detect = ['id', 'user_id', 'dist_ip', 'port', 'priority', 'dist_port']
 
             cur = conn.cursor()
             cur.execute("SELECT " +
@@ -484,6 +484,7 @@ class DbTransfer(object):
                 d['dist_ip'] = str(r[2])
                 d['port'] = int(r[3])
                 d['priority'] = int(r[4])
+                d['dist_port'] = int(r[5])
                 self.relay_rule_list[d['id']] = d
 
             cur.close()
