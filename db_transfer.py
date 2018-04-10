@@ -142,10 +142,10 @@ class DbTransfer(object):
                     str(get_config().NODE_ID) + "', '" + str(alive_user_count) + "', unix_timestamp()); ")
         cur.close()
 
-        cur = conn.cursor()
-        cur.execute("INSERT INTO `ss_node_info` (`id`, `node_id`, `uptime`, `load`, `log_time`) VALUES (NULL, '" +
-                    str(get_config().NODE_ID) + "', '" + str(self.uptime()) + "', '" + str(self.load()) + "', unix_timestamp()); ")
-        cur.close()
+#        cur = conn.cursor()
+#        cur.execute("INSERT INTO `ss_node_info` (`id`, `node_id`, `uptime`, `load`, `log_time`) VALUES (NULL, '" +
+#                    str(get_config().NODE_ID) + "', '" + str(self.uptime()) + "', '" + str(self.load()) + "', unix_timestamp()); ")
+#        cur.close()
 
         online_iplist = ServerPool.get_instance().get_servers_iplist()
         for id in online_iplist.keys():
