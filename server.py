@@ -22,12 +22,12 @@ import os
 import logging
 
 if __name__ == '__main__':
-import inspect
-os.chdir(
-	os.path.dirname(
-		os.path.realpath(
-			inspect.getfile(
-				inspect.currentframe()))))
+	import inspect
+	os.chdir(
+		os.path.dirname(
+			os.path.realpath(
+				inspect.getfile(
+					inspect.currentframe()))))
 
 import server_pool
 import db_transfer
