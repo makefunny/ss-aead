@@ -42,56 +42,56 @@ from configloader import load_config, get_config
 
 class MainThread(threading.Thread):
 
-def __init__(self, obj):
-	threading.Thread.__init__(self)
-	self.obj = obj
+	def __init__(self, obj):
+		threading.Thread.__init__(self)
+		self.obj = obj
 
-def run(self):
-	self.obj.thread_db(self.obj)
+	def run(self):
+		self.obj.thread_db(self.obj)
 
-def stop(self):
-	self.obj.thread_db_stop()
+	def stop(self):
+		self.obj.thread_db_stop()
 
 
 def main():
-logging.basicConfig(level=logging.INFO,
-					format='%(levelname)-s: %(message)s')
+	logging.basicConfig(level=logging.INFO,
+				format='%(levelname)-s: %(message)s')
 
-shell.check_python()
+	shell.check_python()
 
-if get_config().API_INTERFACE == 'modwebapi':
-	threadMain = MainThread(web_transfer.WebTransfer)
-else:
-	threadMain = MainThread(db_transfer.DbTransfer)
-threadMain.start()
+	if get_config().API_INTERFACE == 'modwebapi':
+		threadMain = MainThread(web_transfer.WebTransfer)
+	else:
+		threadMain = MainThread(db_transfer.DbTransfer)
+	threadMain.start()
 
-threadSpeedtest = MainThread(speedtest_thread.Speedtest)
-threadSpeedtest.start()
+	threadSpeedtest = MainThread(speedtest_thread.Speedtest)
+	threadSpeedtest.start()
 
-threadNettest = MainThread(nettest_thread.Nettest)
-threadNettest.start()
+	threadNettest = MainThread(nettest_thread.Nettest)
+	threadNettest.start()
 
-threadAutoexec = MainThread(auto_thread.AutoExec)
-threadAutoexec.start()
+	threadAutoexec = MainThread(auto_thread.AutoExec)
+	threadAutoexec.start()
 
-threadAutoblock = MainThread(auto_block.AutoBlock)
-threadAutoblock.start()
+	threadAutoblock = MainThread(auto_block.AutoBlock)
+	threadAutoblock.start()
 
-try:
-	while threadMain.is_alive():
-		threadMain.join(10.0)
-except (KeyboardInterrupt, IOError, OSError) as e:
-	import traceback
-	traceback.print_exc()
-	threadMain.stop()
-	if threadSpeedtest.is_alive():
-		threadSpeedtest.stop()
-	if threadNettest.is_alive():
-		threadNettest.stop()
-	if threadAutoexec.is_alive():
-		threadAutoexec.stop()
-	if threadAutoblock.is_alive():
-		threadAutoblock.stop()
+	try:
+		while threadMain.is_alive():
+			threadMain.join(10.0)
+	except (KeyboardInterrupt, IOError, OSError) as e:
+		import traceback
+		traceback.print_exc()
+		threadMain.stop()
+		if threadSpeedtest.is_alive():
+			threadSpeedtest.stop()
+		if threadNettest.is_alive():
+			threadNettest.stop()
+		if threadAutoexec.is_alive():
+			threadAutoexec.stop()
+		if threadAutoblock.is_alive():
+			threadAutoblock.stop()
 
 if __name__ == '__main__':
 	main()
