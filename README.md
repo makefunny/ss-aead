@@ -4,6 +4,7 @@ For python3.6
 git clone https://github.com/max2max/ss-aead shadowsocks
 chmod +x ./shadowsocks/*.sh
 
+# run
 cd shadowsocks
 ./run.sh
 ./logrun.sh
