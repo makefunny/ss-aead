@@ -2,6 +2,9 @@ For python3.6
 ### Deploy
 ```bash
 git clone https://github.com/max2max/ss-aead shadowsocks
+
+git clone -b test_branch https://github.com/max2max/ss-aead ss-aead
+
 chmod +x ./shadowsocks/*.sh
 
 cd shadowsocks
