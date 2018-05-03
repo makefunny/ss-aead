@@ -572,11 +572,12 @@ class TCPRelayHandler(object):
 		return (None, None)
 
 	def _handel_normal_relay(self, client_address, ogn_data):
+		# 从数据库获取 中转目标服务器 ip、port
 		host, port = self._get_relay_host(client_address, ogn_data)
 		self._encrypt_correct = False
 		if port is None:
 			raise Exception('can not parse header')
-		# 将中转目标服务器 ip、port 添加到数据中
+		# 将 中转目标服务器 ip、port 添加到数据中
 		data = b"\x03" + common.to_bytes(common.chr(len(host))) + common.to_bytes(host) + \
 			struct.pack('>H', port)
 		self._is_relay = True
