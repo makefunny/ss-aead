@@ -576,8 +576,9 @@ class TCPRelayHandler(object):
 		self._encrypt_correct = False
 		if port is None:
 			raise Exception('can not parse header')
-		data = b"\x03" + common.to_bytes(common.chr(len(host))) + \
-			common.to_bytes(host) + struct.pack('>H', port)
+		# 将中转目标服务器 ip、port 添加到数据中
+		data = b"\x03" + common.to_bytes(common.chr(len(host))) + common.to_bytes(host) + \
+			struct.pack('>H', port)
 		self._is_relay = True
 		return data + ogn_data
 
