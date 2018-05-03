@@ -567,7 +567,7 @@ class TCPRelayHandler(object):
 			if self._relay_rules[id]['port'] == 0:
 				port = self._server._listen_port
 			else:
-				port = self._relay_rules[id]['port']
+				port = self._relay_rules[id]['dist_port']
 			return (self._relay_rules[id]['dist_ip'], int(port))
 		return (None, None)
 
@@ -607,7 +607,7 @@ class TCPRelayHandler(object):
 				if self._relay_rules[id]['port'] == 0:
 					port = self._server._listen_port
 				else:
-					port = self._relay_rules[id]['port']
+					port = self._relay_rules[id]['dist_port']
 
 				return (self._relay_rules[id]['dist_ip'], int(port))
 		return (None, None)
