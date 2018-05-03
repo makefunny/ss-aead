@@ -338,7 +338,7 @@ class DbTransfer(object):
 		cur = conn.cursor()
 
 		cur.execute("SELECT `node_group`,`node_class`,`node_speedlimit`,`traffic_rate`,`mu_only`,`sort` FROM ss_node where `id`='" +
-					str(get_config().NODE_ID) + "' AND (`node_bandwidth`<`node_bandwidth_limit` OR `node_bandwidth_limit`=0)")
+				str(get_config().NODE_ID) + "' AND (`node_bandwidth`<`node_bandwidth_limit` OR `node_bandwidth_limit`=0)")
 		nodeinfo = cur.fetchone()
 
 		if nodeinfo is None:
@@ -367,12 +367,12 @@ class DbTransfer(object):
 
 		cur = conn.cursor()
 		cur.execute("SELECT " +
-					','.join(keys) +
-					" FROM user WHERE ((`class`>=" +
-					str(nodeinfo[1]) +
-					" " +
-					node_group_sql +
-					") OR `is_admin`=1) AND`enable`=1 AND `expire_in`>now() AND `transfer_enable`>`u`+`d`")
+			','.join(keys) +
+			" FROM user WHERE ((`class`>=" +
+			str(nodeinfo[1]) +
+			" " +
+			node_group_sql +
+			") OR `is_admin`=1) AND`enable`=1 AND `expire_in`>now() AND `transfer_enable`>`u`+`d`")
 		rows = []
 		for r in cur.fetchall():
 			d = {}
@@ -396,7 +396,7 @@ class DbTransfer(object):
 
 		cur = conn.cursor()
 		cur.execute("SELECT " + ','.join(keys_detect) +
-					" FROM detect_list where `type` = 1")
+			" FROM detect_list where `type` = 1")
 
 		exist_id_list = []
 
@@ -431,7 +431,7 @@ class DbTransfer(object):
 
 		cur = conn.cursor()
 		cur.execute("SELECT " + ','.join(keys_detect) +
-					" FROM detect_list where `type` = 2")
+			" FROM detect_list where `type` = 2")
 
 		exist_id_list = []
 
@@ -644,9 +644,6 @@ class DbTransfer(object):
 						if self.relay_rule_list[id]['dist_ip'] == '0.0.0.0':
 							continue
 
-						if self.relay_rule_list[id]['dist_port'] != self.relay_rule_list[id]['port']:
-							self.relay_rule_list[id]['port'] = self.relay_rule_list[id]['dist_port']
-
 						temp_relay_rules[id] = self.relay_rule_list[id]
 
 				cfg['relay_rules'] = temp_relay_rules.copy()
@@ -717,9 +714,6 @@ class DbTransfer(object):
 							if self.relay_rule_list[id][
 									'dist_ip'] == '0.0.0.0':
 								continue
-
-							if self.relay_rule_list[id]['dist_port'] != self.relay_rule_list[id]['port']:
-								self.relay_rule_list[id]['port'] = self.relay_rule_list[id]['dist_port']
 
 							temp_relay_rules[id] = self.relay_rule_list[id]
 
