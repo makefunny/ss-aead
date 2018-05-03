@@ -373,6 +373,11 @@ class DbTransfer(object):
 			" " +
 			node_group_sql +
 			") OR `is_admin`=1) AND`enable`=1 AND `expire_in`>now() AND `transfer_enable`>`u`+`d`")
+
+		mykeys = ['user_id','passwd','method','protocol','protocol_param','obfs','obfs_param','port']
+		mycur = conn.cursor()
+		mycur.execute("SELECT " + ','.join(mykeys) + " FROM user_method WHERE `node_id`=" + str(get_config().NODE_ID))
+
 		rows = []
 		passwdlist=mycur.fetchall()
 		for r1 in cur.fetchall():
