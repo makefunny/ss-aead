@@ -374,12 +374,21 @@ class DbTransfer(object):
 			node_group_sql +
 			") OR `is_admin`=1) AND`enable`=1 AND `expire_in`>now() AND `transfer_enable`>`u`+`d`")
 		rows = []
-		for r in cur.fetchall():
+		passwdlist=mycur.fetchall()
+		for r1 in cur.fetchall():
 			d = {}
 			for column in range(len(keys)):
-				d[keys[column]] = r[column]
-			rows.append(d)
+				d[keys[column]] = r1[column]
+			for r2 in passwdlist:
+				if (r1[0]==r2[0] and 'passwd' not in d):
+					for column in range(1,len(mykeys)):
+						d[mykeys[column]] = r2[column]
+					rows.append(d)
+					break
+				else:
+					continue
 		cur.close()
+		mycur.close()
 
 		# 读取节点IP
 		# SELECT * FROM `ss_node`  where `node_ip` != ''
