@@ -366,7 +366,7 @@ class UDPRelay(object):
             if self._relay_rules[id]['port'] == 0:
                 port = self._listen_port
             else:
-                port = self._relay_rules[id]['port']
+                port = self._relay_rules[id]['dist_port']
             return (self._relay_rules[id]['dist_ip'], int(port))
         return (None, None)
 
@@ -403,7 +403,7 @@ class UDPRelay(object):
                 if self._relay_rules[id]['port'] == 0:
                     port = self._listen_port
                 else:
-                    port = self._relay_rules[id]['port']
+                    port = self._relay_rules[id]['dist_port']
 
                 return (self._relay_rules[id]['dist_ip'], int(port))
         return (None, None)
