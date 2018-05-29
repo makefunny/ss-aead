@@ -10,6 +10,7 @@ import configloader
 import importloader
 import cymysql
 import subprocess
+import socket
 from shadowsocks import common, shell
 
 class Nettest(object):
