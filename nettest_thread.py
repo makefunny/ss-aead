@@ -10,6 +10,7 @@ import configloader
 import importloader
 import cymysql
 import subprocess
+import socket
 from shadowsocks import common, shell
 
 class Nettest(object):
@@ -76,6 +77,21 @@ class Nettest(object):
                 i += 1
             return testlist
 
+        def gettcping(ip_port):
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            t_start = round(time.time()*1000)
+            try:
+                s.settimeout(1)
+                s.connect(ip_port)
+                s.shutdown(socket.SHUT_RD)
+                t_end = round(time.time()*1000)
+                s.settimeout(None)
+                return str(t_end-t_start)+"ms"
+                # s.close()
+            except Exception as e:
+                s.settimeout(None)
+                return "timeout"
+
         def getmyping(ip):
             laytency = subprocess.Popen(["ping -c 1 " + ip + ' | grep "time="'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
             try:
@@ -97,8 +113,19 @@ class Nettest(object):
             cur.close()
             return n
 
+        def gettcpinglist():
+            cur = conn.cursor()
+            cur.execute("SELECT `id`,`ip`,`port` FROM `test_ip` where `ip` != ''")
+            n=[]
+            for r in cur.fetchall():
+                r = list(r)
+                n.append(r[0])
+                n.append(gettcping( (r[1],int(r[2])) ))
+            cur.close()
+            return n
+
         cur = conn.cursor()
-        cur.execute("INSERT INTO `ss_node_net_info` (`id`, `node_id`, `up`, `dl`, `ping`, `log_time`) VALUES (NULL, '" + str(configloader.get_config().NODE_ID) + "', '" + str(speed()[0]) + "', '" + str(speed()[1]) + "', '" + list2str(getpinglist()) + "', unix_timestamp()); ")
+        cur.execute("INSERT INTO `ss_node_net_info` (`id`, `node_id`, `up`, `dl`, `ping`, `log_time`) VALUES (NULL, '" + str(configloader.get_config().NODE_ID) + "', '" + str(speed()[0]) + "', '" + str(speed()[1]) + "', '" + list2str(gettcpinglist()) + "', unix_timestamp()); ")
         cur.close()
         conn.close()
 
