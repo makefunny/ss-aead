@@ -85,9 +85,9 @@ class DbTransfer(object):
 				continue
 
 			query_sub_when += ' WHEN %s THEN u+%s' % (
-				id, dt_transfer[id][0] * self.traffic_rate)
+				self.port_uid_table[id], dt_transfer[id][0] * self.traffic_rate)
 			query_sub_when2 += ' WHEN %s THEN d+%s' % (
-				id, dt_transfer[id][1] * self.traffic_rate)
+				self.port_uid_table[id], dt_transfer[id][1] * self.traffic_rate)
 			update_transfer[id] = dt_transfer[id]
 
 			alive_user_count = alive_user_count + 1
@@ -114,14 +114,14 @@ class DbTransfer(object):
 				(dt_transfer[id][0] + dt_transfer[id][1])
 
 			if query_sub_in is not None:
-				query_sub_in += ',%s' % id
+				query_sub_in += ',%s' % self.port_uid_table[id]
 			else:
-				query_sub_in = '%s' % id
+				query_sub_in = '%s' % self.port_uid_table[id]
 		if query_sub_when != '':
-			query_sql = query_head + ' SET u = CASE port' + query_sub_when + \
-				' END, d = CASE port' + query_sub_when2 + \
+			query_sql = query_head + ' SET u = CASE id' + query_sub_when + \
+				' END, d = CASE id' + query_sub_when2 + \
 				' END, t = unix_timestamp() ' + \
-				' WHERE port IN (%s)' % query_sub_in
+				' WHERE id IN (%s)' % query_sub_in
 
 			cur = conn.cursor()
 			cur.execute(query_sql)
