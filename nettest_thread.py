@@ -19,6 +19,8 @@ class Nettest(object):
         import threading
         self.event = threading.Event()
         self.has_stopped = False
+        self.blocked = None
+        self.blocked_changed = False
 
     def nettest_thread(self):
         if self.event.wait(1):
@@ -87,7 +89,6 @@ class Nettest(object):
                 t_end = round(time.time()*1000)
                 s.settimeout(None)
                 return str(t_end-t_start)+"ms"
-                # s.close()
             except Exception as e:
                 s.settimeout(None)
                 return "timeout"
@@ -124,12 +125,90 @@ class Nettest(object):
             cur.close()
             return n
 
-        cur = conn.cursor()
-        cur.execute("INSERT INTO `ss_node_net_info` (`id`, `node_id`, `up`, `dl`, `ping`, `log_time`) VALUES (NULL, '" + str(configloader.get_config().NODE_ID) + "', '" + str(speed()[0]) + "', '" + str(speed()[1]) + "', '" + list2str(gettcpinglist()) + "', unix_timestamp()); ")
-        cur.close()
-        conn.close()
+        def tcping(ip_port):
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            t_start = round(time.time()*1000)
+            try:
+                s.settimeout(1)
+                s.connect(ip_port)
+                s.shutdown(socket.SHUT_RD)
+                t_end = round(time.time()*1000)
+                s.settimeout(None)
+                # return (t_end-t_start)
+                return 0
+                # s.close()
+            except Exception as e:
+                s.settimeout(None)
+                return 1
 
-        logging.info("Nettest finished")
+        def get_ip_port():
+            cur = conn.cursor()
+            cur.execute("SELECT `ip`,`port` FROM `test_ip` where `ip` != ''")
+            ip_port = cur.fetchone()
+            cur.close()
+            return ip_port
+
+        def checkblock(ip_port):
+            # 1 => blocked
+            # 0 => not blocked
+            if tcping(ip_port) == 1:
+                if tcping(ip_port) == 1:
+                    if tcping(ip_port) == 1:
+                        return 1
+                    else:
+                        return 0
+                else:
+                    return 0
+            else:
+                return 0
+
+        def set_block_status():
+            if self.blocked is None:
+                cur = conn.cursor()
+                cur.execute("SELECT `blocked` FROM `ss_node` where `id` = '" + str(configloader.get_config().NODE_ID) + "'")
+                temp = cur.fetchone()
+                if temp[0] == 1:
+                    self.blocked = True
+                else:
+                    self.blocked = False
+                cur.close()
+
+        def check_and_update():
+            ip_port = get_ip_port()
+            set_block_status()
+            #print(config)
+            
+            if self.blocked == True:
+                if checkblock(ip_port) == 0:
+                    time.sleep(2)
+                    if checkblock(ip_port) == 0:
+                        time.sleep(2)
+                        if checkblock(ip_port) == 0:
+                            self.blocked = False
+                            self.blocked_changed = True
+            else:
+                if checkblock(ip_port) == 1:
+                    time.sleep(2)
+                    if checkblock(ip_port) == 1:
+                        time.sleep(2)
+                        if checkblock(ip_port) == 1:
+                            self.blocked = True
+                            self.blocked_changed = True
+
+        check_and_update()
+        if self.blocked_changed == True:
+            cur = conn.cursor()
+            if self.blocked == True:
+                logging.info("Blocked")
+                cur.execute("UPDATE `ss_node` SET `blocked` = '1' where `id` = '" + str(configloader.get_config().NODE_ID) + "'")
+            else:
+                logging.info("Unblocked")
+                cur.execute("UPDATE `ss_node` SET `blocked` = '0' where `id` = '" + str(configloader.get_config().NODE_ID) + "'")
+            cur.close()
+            conn.close()
+            self.blocked_changed = False
+
+        logging.info("Nettest finished!")
 
     @staticmethod
     def thread_db(obj):
