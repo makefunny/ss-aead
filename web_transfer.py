@@ -222,7 +222,9 @@ class WebTransfer(object):
         else:
             self.is_relay = False
 
-        data = webapi.getApi('users', {'node_id': get_config().NODE_ID})
+        #data = webapi.getApi('users', {'node_id': get_config().NODE_ID})
+        import port_range
+        data = port_range.getWebUsersDelBanPort()
 
         if not data:
             rows = []

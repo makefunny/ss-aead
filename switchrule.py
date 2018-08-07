@@ -22,6 +22,15 @@ def getKeys():
     return key_list
     # return key_list + ['plan'] # append the column name 'plan'
 
+def getPortGroupKeys():
+    keys_dict = {}
+    keys_dict['user'] = ['id', 'u', 'd', 'transfer_enable', 'enable',
+        'node_speedlimit',
+        'forbidden_ip', 'forbidden_port', 'disconnect_ip',
+        'is_multi_user'
+    ]
+    keys_dict['user_method'] = ['passwd','method','protocol','protocol_param','obfs','obfs_param','port']
+    return keys_dict
 
 def isTurnOn(row):
     return True

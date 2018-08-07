@@ -31,11 +31,15 @@ class DbTransfer(object):
         self.node_speedlimit = 0.00
         self.traffic_rate = 0.0
 
-        self.detect_text_list = {}
-        self.detect_text_ischanged = False
+        self.detect_text_list_all = {}
+        self.detect_text_all_ischanged = False
+        self.detect_hex_list_all = {}
+        self.detect_hex_all_ischanged = False
+        self.detect_text_list_dns = {}
+        self.detect_text_dns_ischanged = False
+        self.detect_hex_list_dns = {}
+        self.detect_hex_dns_ischanged = False
 
-        self.detect_hex_list = {}
-        self.detect_hex_ischanged = False
         self.mu_only = False
         self.is_relay = False
 
@@ -45,18 +49,8 @@ class DbTransfer(object):
 
         self.has_stopped = False
 
-    def update_all_user(self, dt_transfer):
+    def getMysqlConn(self):
         import cymysql
-        update_transfer = {}
-
-        query_head = 'UPDATE user'
-        query_sub_when = ''
-        query_sub_when2 = ''
-        query_sub_in = None
-
-        alive_user_count = 0
-        bandwidth_thistime = 0
-
         if get_config().MYSQL_SSL_ENABLE == 1:
             conn = cymysql.connect(
                 host=get_config().MYSQL_HOST,
@@ -77,17 +71,31 @@ class DbTransfer(object):
                 passwd=get_config().MYSQL_PASS,
                 db=get_config().MYSQL_DB,
                 charset='utf8')
-
         conn.autocommit(True)
+        return conn
+
+    def update_all_user(self, dt_transfer):
+        import cymysql
+        update_transfer = {}
+
+        query_head = 'UPDATE user'
+        query_sub_when = ''
+        query_sub_when2 = ''
+        query_sub_in = None
+
+        alive_user_count = 0
+        bandwidth_thistime = 0
+
+        conn = self.getMysqlConn()
 
         for id in dt_transfer.keys():
             if dt_transfer[id][0] == 0 and dt_transfer[id][1] == 0:
                 continue
 
             query_sub_when += ' WHEN %s THEN u+%s' % (
-                id, dt_transfer[id][0] * self.traffic_rate)
+                self.port_uid_table[id], dt_transfer[id][0] * self.traffic_rate)
             query_sub_when2 += ' WHEN %s THEN d+%s' % (
-                id, dt_transfer[id][1] * self.traffic_rate)
+                self.port_uid_table[id], dt_transfer[id][1] * self.traffic_rate)
             update_transfer[id] = dt_transfer[id]
 
             alive_user_count = alive_user_count + 1
@@ -114,14 +122,14 @@ class DbTransfer(object):
                 (dt_transfer[id][0] + dt_transfer[id][1])
 
             if query_sub_in is not None:
-                query_sub_in += ',%s' % id
+                query_sub_in += ',%s' % self.port_uid_table[id]
             else:
-                query_sub_in = '%s' % id
+                query_sub_in = '%s' % self.port_uid_table[id]
         if query_sub_when != '':
-            query_sql = query_head + ' SET u = CASE port' + query_sub_when + \
-                ' END, d = CASE port' + query_sub_when2 + \
+            query_sql = query_head + ' SET u = CASE id' + query_sub_when + \
+                ' END, d = CASE id' + query_sub_when2 + \
                 ' END, t = unix_timestamp() ' + \
-                ' WHERE port IN (%s)' % query_sub_in
+                ' WHERE id IN (%s)' % query_sub_in
 
             cur = conn.cursor()
             cur.execute(query_sql)
@@ -142,10 +150,10 @@ class DbTransfer(object):
                     str(get_config().NODE_ID) + "', '" + str(alive_user_count) + "', unix_timestamp()); ")
         cur.close()
 
-#        cur = conn.cursor()
-#        cur.execute("INSERT INTO `ss_node_info` (`id`, `node_id`, `uptime`, `load`, `log_time`) VALUES (NULL, '" +
-#                    str(get_config().NODE_ID) + "', '" + str(self.uptime()) + "', '" + str(self.load()) + "', unix_timestamp()); ")
-#        cur.close()
+       # cur = conn.cursor()
+       # cur.execute("INSERT INTO `ss_node_info` (`id`, `node_id`, `uptime`, `load`, `log_time`) VALUES (NULL, '" +
+       #             str(get_config().NODE_ID) + "', '" + str(self.uptime()) + "', '" + str(self.load()) + "', unix_timestamp()); ")
+       # cur.close()
 
         online_iplist = ServerPool.get_instance().get_servers_iplist()
         for id in online_iplist.keys():
@@ -287,56 +295,192 @@ class DbTransfer(object):
         self.last_update_transfer = last_transfer.copy()
         self.update_all_user(dt_transfer)
 
+    def set_detect_rule_list(self):
+        conn = self.getMysqlConn()
+        # 读取审计规则,数据包匹配部分
+        keys_detect = ['id', 'regex', 'match_filed']
+
+        cur = conn.cursor()
+        cur.execute("SELECT " + ','.join(keys_detect) +
+                    " FROM detect_list WHERE `type` = 1 AND `match_filed` = 0")
+
+        exist_id_list = []
+
+        for r in cur.fetchall():
+            id = int(r[0])
+            exist_id_list.append(id)
+            # add new rule
+            if id not in self.detect_text_list_all:
+                d = {}
+                d['id'] = id
+                d['regex'] = str(r[1])
+                d['match_filed'] = r[2]
+                self.detect_text_list_all[id] = d
+                self.detect_text_all_ischanged = True
+            else:
+                # change rule exist
+                if r[1] != self.detect_text_list_all[id]['regex']:
+                    del self.detect_text_list_all[id]
+                    d = {}
+                    d['id'] = id
+                    d['regex'] = str(r[1])
+                    d['match_filed'] = r[2]
+                    self.detect_text_list_all[id] = d
+                    self.detect_text_all_ischanged = True
+
+        deleted_id_list = []
+        for id in self.detect_text_list_all:
+            if id not in exist_id_list:
+                deleted_id_list.append(id)
+                self.detect_text_all_ischanged = True
+
+        for id in deleted_id_list:
+            del self.detect_text_list_all[id]
+
+        cur.close()
+
+        cur = conn.cursor()
+        cur.execute("SELECT " + ','.join(keys_detect) +
+                    " FROM detect_list WHERE `type` = 2 AND `match_filed` = 0" )
+
+        exist_id_list = []
+
+        for r in cur.fetchall():
+            id = int(r[0])
+            exist_id_list.append(id)
+            if r[0] not in self.detect_hex_list_all:
+                d = {}
+                d['id'] = id
+                d['regex'] = str(r[1])
+                d['match_filed'] = r[2]
+                self.detect_hex_list_all[id] = d
+                self.detect_hex_all_ischanged = True
+            else:
+                if r[1] != self.detect_hex_list_all[r[0]]['regex']:
+                    del self.detect_hex_list_all[id]
+                    d = {}
+                    d['id'] = int(r[0])
+                    d['regex'] = str(r[1])
+                    d['match_filed'] = r[2]
+                    self.detect_hex_list_all[id] = d
+                    self.detect_hex_all_ischanged = True
+
+        deleted_id_list = []
+        for id in self.detect_hex_list_all:
+            if id not in exist_id_list:
+                deleted_id_list.append(id)
+                self.detect_hex_all_ischanged = True
+
+        for id in deleted_id_list:
+            del self.detect_hex_list_all[id]
+
+        cur = conn.cursor()
+        cur.execute("SELECT " + ','.join(keys_detect) +
+                    " FROM detect_list where `type` = 1 AND `match_filed` = 1")
+
+        exist_id_list = []
+
+        for r in cur.fetchall():
+            id = int(r[0])
+            exist_id_list.append(id)
+            # add new rule
+            if id not in self.detect_text_list_dns:
+                print('[if id not in self.detect_text_list_dns] add new rule')
+                d = {}
+                d['id'] = id
+                d['regex'] = str(r[1])
+                d['match_filed'] = r[2]
+                self.detect_text_list_dns[id] = d
+                self.detect_text_dns_ischanged = True
+            else:
+                # change rule exist
+                if r[1] != self.detect_text_list_dns[id]['regex']:
+                    print("[if r[1] != self.detect_text_list_dns[id]['regex']]  edit this rule")
+                    del self.detect_text_list_dns[id]
+                    d = {}
+                    d['id'] = id
+                    d['regex'] = str(r[1])
+                    d['match_filed'] = r[2]
+                    self.detect_text_list_dns[id] = d
+                    self.detect_text_dns_ischanged = True
+
+        deleted_id_list = []
+        for id in self.detect_text_list_dns:
+            if id not in exist_id_list:
+                deleted_id_list.append(id)
+                self.detect_text_dns_ischanged = True
+
+        for id in deleted_id_list:
+            print('del self.detect_text_list_dns[id]')
+            del self.detect_text_list_dns[id]
+
+        cur.close()
+
+        cur = conn.cursor()
+        cur.execute("SELECT " + ','.join(keys_detect) +
+                    " FROM detect_list WHERE `type` = 2 AND `match_filed` = 1" )
+
+        exist_id_list = []
+
+        for r in cur.fetchall():
+            id = int(r[0])
+            exist_id_list.append(id)
+            if r[0] not in self.detect_hex_list_dns:
+                d = {}
+                d['id'] = id
+                d['regex'] = str(r[1])
+                d['match_filed'] = r[2]
+                self.detect_hex_list_dns[id] = d
+                self.detect_hex_dns_ischanged = True
+            else:
+                if r[1] != self.detect_hex_list_dns[r[0]]['regex']:
+                    del self.detect_hex_list_dns[id]
+                    d = {}
+                    d['id'] = int(r[0])
+                    d['regex'] = str(r[1])
+                    d['match_filed'] = r[2]
+                    self.detect_hex_list_dns[id] = d
+                    self.detect_hex_dns_ischanged = True
+
+        deleted_id_list = []
+        for id in self.detect_hex_list_dns:
+            if id not in exist_id_list:
+                deleted_id_list.append(id)
+                self.detect_hex_dns_ischanged = True
+
+        for id in deleted_id_list:
+            del self.detect_hex_list_dns[id]
+
+        cur.close()
+        conn.close()
+
+    def reset_detect_rule_status(self):
+        self.detect_text_all_ischanged = False
+        self.detect_hex_all_ischanged = False
+        self.detect_text_dns_ischanged = False
+        self.detect_hex_dns_ischanged = False
+
     def pull_db_all_user(self):
         import cymysql
         # 数据库所有用户信息
-        try:
+        if get_config().PORT_GROUP == 0:
+            try:
+                switchrule = importloader.load('switchrule')
+                keys = switchrule.getKeys()
+            except Exception as e:
+                keys = [
+                    'id', 'port', 'u', 'd', 'transfer_enable', 'passwd', 'enable',
+                    'method', 'protocol', 'protocol_param', 'obfs', 'obfs_param',
+                    'node_speedlimit', 'forbidden_ip', 'forbidden_port', 'disconnect_ip',
+                    'is_multi_user'
+                ]
+        elif get_config().PORT_GROUP == 1:
             switchrule = importloader.load('switchrule')
-            keys = switchrule.getKeys()
-        except Exception as e:
-            keys = [
-                'id',
-                'port',
-                'u',
-                'd',
-                'transfer_enable',
-                'passwd',
-                'enable',
-                'method',
-                'protocol',
-                'protocol_param',
-                'obfs',
-                'obfs_param',
-                'node_speedlimit',
-                'forbidden_ip',
-                'forbidden_port',
-                'disconnect_ip',
-                'is_multi_user']
+            keys, user_method_keys = switchrule.getPortGroupKeys()['user'], switchrule.getPortGroupKeys()['user_method']
 
-        if get_config().MYSQL_SSL_ENABLE == 1:
-            conn = cymysql.connect(
-                host=get_config().MYSQL_HOST,
-                port=get_config().MYSQL_PORT,
-                user=get_config().MYSQL_USER,
-                passwd=get_config().MYSQL_PASS,
-                db=get_config().MYSQL_DB,
-                charset='utf8',
-                ssl={
-                    'ca': get_config().MYSQL_SSL_CA,
-                    'cert': get_config().MYSQL_SSL_CERT,
-                    'key': get_config().MYSQL_SSL_KEY})
-        else:
-            conn = cymysql.connect(
-                host=get_config().MYSQL_HOST,
-                port=get_config().MYSQL_PORT,
-                user=get_config().MYSQL_USER,
-                passwd=get_config().MYSQL_PASS,
-                db=get_config().MYSQL_DB,
-                charset='utf8')
-        conn.autocommit(True)
+        conn = self.getMysqlConn()
 
         cur = conn.cursor()
-
         cur.execute("SELECT `node_group`,`node_class`,`node_speedlimit`,`traffic_rate`,`mu_only`,`sort` FROM ss_node where `id`='" +
                     str(get_config().NODE_ID) + "' AND (`node_bandwidth`<`node_bandwidth_limit` OR `node_bandwidth_limit`=0)")
         nodeinfo = cur.fetchone()
@@ -360,19 +504,34 @@ class DbTransfer(object):
         else:
             self.is_relay = False
 
-        if nodeinfo[0] == 0:
-            node_group_sql = ""
-        else:
-            node_group_sql = "AND `node_group`=" + str(nodeinfo[0])
+        if get_config().PORT_GROUP == 0:
+            if nodeinfo[0] == 0:
+                node_group_sql = ""
+            else:
+                node_group_sql = "AND `node_group`=" + str(nodeinfo[0])
+            import port_range
+            port_mysql_str = port_range.getPortRangeMysqlStr()
+            cur = conn.cursor()
+            cur.execute("SELECT " + ','.join(keys) +
+                        " FROM user WHERE ( (`class`>=" + str(nodeinfo[1]) + " " + node_group_sql + ") OR `is_admin`=1 ) \
+                        AND `enable`=1 AND `expire_in`>now() AND `transfer_enable`>`u`+`d`" + port_mysql_str)
+        elif get_config().PORT_GROUP == 1:
+            if nodeinfo[0] == 0:
+                node_group_sql = ""
+            else:
+                node_group_sql = "AND a.`node_group`=" + str(nodeinfo[0])
+            import port_range
+            port_mysql_str = port_range.getPortRangeMysqlStrForPortGroup()
+            print(port_mysql_str)
+            cur = conn.cursor()
+            execute_s = "SELECT a.`" + '`,a.`'.join(keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
+                "` FROM user a,user_method b WHERE ( (a.`class`>=" + str(nodeinfo[1]) + " " + node_group_sql + ") OR a.`is_admin`=1 ) " + \
+                "AND a.`enable`=1 AND a.`expire_in`>now() AND a.`transfer_enable`>a.`u`+a.`d` AND b.`node_id`='" + str(get_config().NODE_ID) + "' " + \
+                "AND a.`id`=b.`user_id` " + \
+                port_mysql_str
+            cur.execute(execute_s)
+            keys += user_method_keys
 
-        cur = conn.cursor()
-        cur.execute("SELECT " +
-                    ','.join(keys) +
-                    " FROM user WHERE ((`class`>=" +
-                    str(nodeinfo[1]) +
-                    " " +
-                    node_group_sql +
-                    ") OR `is_admin`=1) AND`enable`=1 AND `expire_in`>now() AND `transfer_enable`>`u`+`d`")
         rows = []
         for r in cur.fetchall():
             d = {}
@@ -391,90 +550,19 @@ class DbTransfer(object):
             self.node_ip_list.append(temp_list[0])
         cur.close()
 
-        # 读取审计规则,数据包匹配部分
-        keys_detect = ['id', 'regex']
-
-        cur = conn.cursor()
-        cur.execute("SELECT " + ','.join(keys_detect) +
-                    " FROM detect_list where `type` = 1")
-
-        exist_id_list = []
-
-        for r in cur.fetchall():
-            id = int(r[0])
-            exist_id_list.append(id)
-            if id not in self.detect_text_list:
-                d = {}
-                d['id'] = id
-                d['regex'] = str(r[1])
-                self.detect_text_list[id] = d
-                self.detect_text_ischanged = True
-            else:
-                if r[1] != self.detect_text_list[id]['regex']:
-                    del self.detect_text_list[id]
-                    d = {}
-                    d['id'] = id
-                    d['regex'] = str(r[1])
-                    self.detect_text_list[id] = d
-                    self.detect_text_ischanged = True
-
-        deleted_id_list = []
-        for id in self.detect_text_list:
-            if id not in exist_id_list:
-                deleted_id_list.append(id)
-                self.detect_text_ischanged = True
-
-        for id in deleted_id_list:
-            del self.detect_text_list[id]
-
-        cur.close()
-
-        cur = conn.cursor()
-        cur.execute("SELECT " + ','.join(keys_detect) +
-                    " FROM detect_list where `type` = 2")
-
-        exist_id_list = []
-
-        for r in cur.fetchall():
-            id = int(r[0])
-            exist_id_list.append(id)
-            if r[0] not in self.detect_hex_list:
-                d = {}
-                d['id'] = id
-                d['regex'] = str(r[1])
-                self.detect_hex_list[id] = d
-                self.detect_hex_ischanged = True
-            else:
-                if r[1] != self.detect_hex_list[r[0]]['regex']:
-                    del self.detect_hex_list[id]
-                    d = {}
-                    d['id'] = int(r[0])
-                    d['regex'] = str(r[1])
-                    self.detect_hex_list[id] = d
-                    self.detect_hex_ischanged = True
-
-        deleted_id_list = []
-        for id in self.detect_hex_list:
-            if id not in exist_id_list:
-                deleted_id_list.append(id)
-                self.detect_hex_ischanged = True
-
-        for id in deleted_id_list:
-            del self.detect_hex_list[id]
-
-        cur.close()
+        self.set_detect_rule_list()
 
         # 读取中转规则，如果是中转节点的话
 
         if self.is_relay:
             self.relay_rule_list = {}
 
-            keys_detect = ['id', 'user_id', 'dist_ip', 'port', 'priority', 'dist_port']
+            keys_relay = ['id', 'user_id', 'dist_ip', 'port', 'priority', 'dist_port']
 
             cur = conn.cursor()
             cur.execute("SELECT " +
-                        ','.join(keys_detect) +
-                        " FROM relay where `source_node_id` = 0 or `source_node_id` = " +
+                        ','.join(keys_relay) +
+                        " FROM relay WHERE `source_node_id` = 0 OR `source_node_id` = " +
                         str(get_config().NODE_ID))
 
             for r in cur.fetchall():
@@ -508,6 +596,7 @@ class DbTransfer(object):
             switchrule = importloader.load('switchrule')
         except Exception as e:
             logging.error('load switchrule.py fail')
+
         cur_servers = {}
         new_servers = {}
 
@@ -613,14 +702,17 @@ class DbTransfer(object):
                 cur_servers[port] = passwd
             else:
                 logging.error(
-                    'more than one user use the same port [%s]' % (port,))
+                    'more than one user use the same port [%s] or there is an another process bind at this port' % (port,)
+                )
                 continue
 
             if cfg['is_multi_user'] != 0:
                 cfg['users_table'] = md5_users.copy()
 
-            cfg['detect_hex_list'] = self.detect_hex_list.copy()
-            cfg['detect_text_list'] = self.detect_text_list.copy()
+            cfg['detect_text_list_all'] = self.detect_text_list_all.copy()
+            cfg['detect_hex_list_all'] = self.detect_hex_list_all.copy()
+            cfg['detect_text_list_dns'] = self.detect_text_list_dns.copy()
+            cfg['detect_hex_list_dns'] = self.detect_hex_list_dns.copy()
 
             if self.is_relay and row['is_multi_user'] != 2:
                 temp_relay_rules = {}
@@ -653,30 +745,38 @@ class DbTransfer(object):
                 cfg['relay_rules'] = temp_relay_rules.copy()
 
             if ServerPool.get_instance().server_is_run(port) > 0:
+                # server is running
+                # xun-huan zai-ru gui-ze, you xin-gui-ze shi, ze hui tong-guo xun-huan de-dao geng-xin
                 cfgchange = False
-                if self.detect_text_ischanged or self.detect_hex_ischanged:
+                if self.detect_text_all_ischanged or self.detect_hex_all_ischanged:
+                    print('[if self.detect_text_all_ischanged or self.detect_hex_all_ischanged] cfgchange = True')
                     cfgchange = True
+                if self.detect_text_dns_ischanged or self.detect_hex_dns_ischanged:
+                    print('[if self.detect_text_dns_ischanged or self.detect_hex_dns_ischanged] cfgchange = True')
+                    if not cfgchange:
+                        cfgchange = True
 
                 if port in ServerPool.get_instance().tcp_servers_pool:
-                    ServerPool.get_instance().tcp_servers_pool[
-                        port].modify_detect_text_list(self.detect_text_list)
-                    ServerPool.get_instance().tcp_servers_pool[
-                        port].modify_detect_hex_list(self.detect_hex_list)
+                    ServerPool.get_instance().tcp_servers_pool[port].modify_detect_text_list_all(self.detect_text_list_all)
+                    ServerPool.get_instance().tcp_servers_pool[port].modify_detect_hex_list_all(self.detect_hex_list_all)
                 if port in ServerPool.get_instance().tcp_ipv6_servers_pool:
-                    ServerPool.get_instance().tcp_ipv6_servers_pool[
-                        port].modify_detect_text_list(self.detect_text_list)
-                    ServerPool.get_instance().tcp_ipv6_servers_pool[
-                        port].modify_detect_hex_list(self.detect_hex_list)
+                    ServerPool.get_instance().tcp_ipv6_servers_pool[port].modify_detect_text_list_all(self.detect_text_list_all)
+                    ServerPool.get_instance().tcp_ipv6_servers_pool[port].modify_detect_hex_list_all(self.detect_hex_list_all)
+
+                if port in ServerPool.get_instance().tcp_servers_pool:
+                    ServerPool.get_instance().tcp_servers_pool[port].modify_detect_text_list_dns(self.detect_text_list_dns)
+                    ServerPool.get_instance().tcp_servers_pool[port].modify_detect_hex_list_dns(self.detect_hex_list_dns)
+                if port in ServerPool.get_instance().tcp_ipv6_servers_pool:
+                    ServerPool.get_instance().tcp_ipv6_servers_pool[port].modify_detect_text_list_dns(self.detect_text_list_dns)
+                    ServerPool.get_instance().tcp_ipv6_servers_pool[port].modify_detect_hex_list_dns(self.detect_hex_list_dns)
+
+                # udp have no dns part
                 if port in ServerPool.get_instance().udp_servers_pool:
-                    ServerPool.get_instance().udp_servers_pool[
-                        port].modify_detect_text_list(self.detect_text_list)
-                    ServerPool.get_instance().udp_servers_pool[
-                        port].modify_detect_hex_list(self.detect_hex_list)
+                    ServerPool.get_instance().udp_servers_pool[port].modify_detect_text_list(self.detect_text_list_all)
+                    ServerPool.get_instance().udp_servers_pool[port].modify_detect_hex_list(self.detect_hex_list_all)
                 if port in ServerPool.get_instance().udp_ipv6_servers_pool:
-                    ServerPool.get_instance().udp_ipv6_servers_pool[
-                        port].modify_detect_text_list(self.detect_text_list)
-                    ServerPool.get_instance().udp_ipv6_servers_pool[
-                        port].modify_detect_hex_list(self.detect_hex_list)
+                    ServerPool.get_instance().udp_ipv6_servers_pool[port].modify_detect_text_list(self.detect_text_list_all)
+                    ServerPool.get_instance().udp_ipv6_servers_pool[port].modify_detect_hex_list(self.detect_hex_list_all)
 
                 if row['is_multi_user'] != 0:
                     if port in ServerPool.get_instance().tcp_servers_pool:
@@ -754,18 +854,17 @@ class DbTransfer(object):
                             cfgchange = True
                             break
                 if not cfgchange and port in ServerPool.get_instance().tcp_ipv6_servers_pool:
-                    relay = ServerPool.get_instance().tcp_ipv6_servers_pool[
-                        port]
+                    relay = ServerPool.get_instance().tcp_ipv6_servers_pool[port]
                     for name in merge_config_keys:
-                        if name in cfg and not self.cmp(
-                                cfg[name], relay._config[name]):
+                        if name in cfg and not self.cmp(cfg[name], relay._config[name]):
                             cfgchange = True
                             break
-                # config changed
+                # if config changed, then restart this server
                 if cfgchange:
                     self.del_server(port, "config changed")
                     new_servers[port] = (passwd, cfg)
             elif ServerPool.get_instance().server_run_status(port) is False:
+                # server is not running
                 # new_servers[port] = passwd
                 self.new_server(port, passwd, cfg)
 
@@ -863,8 +962,7 @@ class DbTransfer(object):
                     db_instance.push_db_all_user()
                     rows = db_instance.pull_db_all_user()
                     db_instance.del_server_out_of_bound_safe(last_rows, rows)
-                    db_instance.detect_text_ischanged = False
-                    db_instance.detect_hex_ischanged = False
+                    db_instance.reset_detect_rule_status()
                     last_rows = rows
                 except Exception as e:
                     trace = traceback.format_exc()

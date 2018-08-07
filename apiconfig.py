@@ -4,6 +4,11 @@ NODE_ID = nodeid
 # net upload download log and the unit is minute
 NETTEST = 0
 
+# port group
+# 0 => default, ignore this
+# 1 => manual set
+PORT_GROUP = 0
+
 # hour,set 0 to disable
 SPEEDTEST = 0
 CLOUDSAFE = 1
@@ -47,3 +52,8 @@ MANAGE_PASS = 'ss233333333'
 MANAGE_BIND_IP = '127.0.0.1'
 # make sure this port is idle
 MANAGE_PORT = 23333
+
+# set blank to ignore this
+PORT_ALLOW_RANGE = []
+PORT_NOT_ALLOW_RANGE = []
+PORT_NOT_ALLOW_LIST = []

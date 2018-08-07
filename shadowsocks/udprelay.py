@@ -192,8 +192,8 @@ class UDPRelay(object):
 
         self.is_pushing_detect_hex_list = False
         self.is_pushing_detect_text_list = False
-        self.detect_hex_list = self._config['detect_hex_list'].copy()
-        self.detect_text_list = self._config['detect_text_list'].copy()
+        self.detect_hex_list = self._config['detect_hex_list_all'].copy()
+        self.detect_text_list = self._config['detect_text_list_all'].copy()
 
         self.protocol_data = obfs.obfs(config['protocol']).init_data()
         self._protocol = obfs.obfs(config['protocol'])
