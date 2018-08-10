@@ -14,7 +14,7 @@ import importloader
 import platform
 import datetime
 import fcntl
-import webapi_utils
+
 
 def getMysqlConn():
     if get_config().MYSQL_SSL_ENABLE == 1:
@@ -151,6 +151,7 @@ def getMysqlUsers():
         print(r['port'])
 
 def getWebUsersDelBanPort():
+    import webapi_utils
     webapi = webapi_utils.WebApi()
     data = webapi.getApi('users', {'node_id': get_config().NODE_ID})
     indexTodel = []
