@@ -9,6 +9,10 @@ NETTEST = 0
 # 1 => manual set
 PORT_GROUP = 0
 
+# 0 => disable dns_log
+# 1 => enable it
+ENABLE_DNSLOG = 0
+
 # hour,set 0 to disable
 SPEEDTEST = 0
 CLOUDSAFE = 1

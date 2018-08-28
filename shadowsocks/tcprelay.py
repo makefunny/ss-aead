@@ -28,6 +28,7 @@ import traceback
 import random
 import platform
 import threading
+import os
 
 from shadowsocks import encrypt, obfs, eventloop, shell, common
 from shadowsocks.common import pre_parse_header, parse_header, IPNetwork, PortRange
@@ -95,6 +96,41 @@ TCP_MSS = NETWORK_MTU - 40
 BUF_SIZE = 32 * 1024
 UDP_MAX_BUF_SIZE = 65536
 
+class dnsLogger(object):
+    def __init__(self):
+        self.dir = os.path.abspath(os.getcwd())
+        self.path = self.dir + '/dns.log'
+        if not os.path.isfile(self.path):
+            f = open(self.path, 'w')
+            f.close()
+
+    def logTime(self):
+        return time.strftime("%Y-%m-%d %H:%M:%S")
+
+    def logLevel(self, level):
+        if level == -999:
+            return "[test]"
+        elif level == -1:
+            return "[failed]"
+        elif level == 0:
+            return "[info]"
+        elif level == 1:
+            return "[success]"
+        elif level == 2:
+            return "[warning]"
+        elif level == 3:
+            return "[dns_detected]"
+
+    def info(self, strMain):
+        strToAdd = self.logTime() + " " + self.logLevel(0) + " " + strMain + "\n"
+        with open(self.path, 'a') as f:
+            f.write(strToAdd)
+        f.close()
+    def detected(self, strMain):
+        strToAdd = self.logTime() + " " + self.logLevel(3) + " " + strMain + "\n"
+        with open(self.path, 'a') as f:
+            f.write(strToAdd)
+        f.close()
 
 class SpeedTester(object):
 
@@ -126,6 +162,7 @@ class TCPRelayHandler(object):
 
     def __init__(self, server, fd_to_handlers, loop, local_sock, config,
                  dns_resolver, is_local):
+        self.logger = dnsLogger()
         self._server = server
         self._fd_to_handlers = fd_to_handlers
         self._loop = loop
@@ -928,7 +965,7 @@ class TCPRelayHandler(object):
                 if not is_error:
                     if not self._server.is_pushing_detect_text_list_dns:
                         for id in self._server.detect_text_list_dns:
-                            if common.match_regex(self._server.detect_text_list_dns[id]['regex'], str(data)):
+                            if common.match_regex(self._server.detect_text_list_dns[id]['regex'], common.to_str(remote_addr)):
                                 if self._config['is_multi_user'] != 0 and self._current_user_id != 0:
                                     if self._server.is_cleaning_mu_detect_log_list == False and id not in self._server.mu_detect_log_list[self._current_user_id]:
                                         self._server.mu_detect_log_list[self._current_user_id].append(id)
@@ -936,6 +973,11 @@ class TCPRelayHandler(object):
                                     if self._server.is_cleaning_detect_log == False and id not in self._server.detect_log_list:
                                         self._server.detect_log_list.append(id)
                                 self._handle_detect_rule_match(remote_port)
+                                if self._config['enable_DnsLog']:
+                                    try:
+                                        self.logger.detected( 'DNS: %s, user_id: %d, server_port: %d, client ip: %s' % (common.to_str(remote_addr), self._config['user_id'], self._server._listen_port, common.getRealIp(self._client_address[0]))  )
+                                    except Exception as e:
+                                        logging.error('DNS log error: %s', str(e))
                                 raise Exception(
                                     '[dns_detect] This connection match the regex: id:%d was reject,regex: %s ,%s connecting %s:%d from %s:%d via port %d' %
                                     (
@@ -946,25 +988,36 @@ class TCPRelayHandler(object):
                                         self._server._listen_port
                                     )
                                 )
-                    if not self._server.is_pushing_detect_hex_list_dns:
-                        for id in self._server.detect_hex_list_dns:
-                            if common.match_regex(self._server.detect_hex_list_dns[id]['regex'],binascii.hexlify(data)):
-                                if self._config['is_multi_user'] != 0 and self._current_user_id != 0:
-                                    if self._server.is_cleaning_mu_detect_log_list == False and id not in self._server.mu_detect_log_list[self._current_user_id]:
-                                        self._server.mu_detect_log_list[self._current_user_id].append(id)
-                                else:
-                                    if self._server.is_cleaning_detect_log == False and id not in self._server.detect_log_list:
-                                        self._server.detect_log_list.append(id)
-                                self._handle_detect_rule_match(remote_port)
-                                raise Exception(
-                                    'This connection match the regex: id:%d was reject,regex: %s ,connecting %s:%d from %s:%d via port %d' %
-                                    (
-                                        self._server.detect_hex_list_dns[id]['id'], self._server.detect_hex_list_dns[id]['regex'],
-                                        common.to_str(remote_addr), remote_port,
-                                        self._client_address[0], self._client_address[1],
-                                        self._server._listen_port
-                                    )
-                                )
+                            else:
+                                if self._config['enable_DnsLog']:
+                                    try:
+                                        self.logger.info( 'DNS: %s, user_id: %d, server_port: %d, client ip: %s' % (common.to_str(remote_addr), self._config['user_id'], self._server._listen_port, common.getRealIp(self._client_address[0]))  )
+                                    except Exception as e:
+                                        logging.error('DNS log error: %s', str(e))
+                    # remote_addr => what is hex type?
+                    # if not self._server.is_pushing_detect_hex_list_dns:
+                    #     for id in self._server.detect_hex_list_dns:
+                    #         try:
+                    #             self.logger.info( 'DNS: %s , user_id: %d, client ip: %s' % (common.to_str(remote_addr), self._current_user_id, common.getRealIp(self._client_address[0]))  )
+                    #         except Exception as e:
+                    #             logging.error('DNS log error: %s', str(e))
+                    #         if common.match_regex(self._server.detect_hex_list_dns[id]['regex'],binascii.hexlify(data)):
+                    #             if self._config['is_multi_user'] != 0 and self._current_user_id != 0:
+                    #                 if self._server.is_cleaning_mu_detect_log_list == False and id not in self._server.mu_detect_log_list[self._current_user_id]:
+                    #                     self._server.mu_detect_log_list[self._current_user_id].append(id)
+                    #             else:
+                    #                 if self._server.is_cleaning_detect_log == False and id not in self._server.detect_log_list:
+                    #                     self._server.detect_log_list.append(id)
+                    #             self._handle_detect_rule_match(remote_port)
+                    #             raise Exception(
+                    #                 '[dns_detect] This connection match the regex: id:%d was reject,regex: %s ,connecting %s:%d from %s:%d via port %d' %
+                    #                 (
+                    #                     self._server.detect_hex_list_dns[id]['id'], self._server.detect_hex_list_dns[id]['regex'],
+                    #                     common.to_str(remote_addr), remote_port,
+                    #                     self._client_address[0], self._client_address[1],
+                    #                     self._server._listen_port
+                    #                 )
+                    #             )
 
                 self._dns_resolver.resolve(remote_addr,self._handle_dns_resolved)
         except Exception as e:

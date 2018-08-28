@@ -49,6 +49,8 @@ class DbTransfer(object):
 
         self.has_stopped = False
 
+        self.enableDnsLog = True
+
     def getMysqlConn(self):
         import cymysql
         if get_config().MYSQL_SSL_ENABLE == 1:
@@ -478,6 +480,11 @@ class DbTransfer(object):
             switchrule = importloader.load('switchrule')
             keys, user_method_keys = switchrule.getPortGroupKeys()['user'], switchrule.getPortGroupKeys()['user_method']
 
+        if get_config().ENABLE_DNSLOG == 0:
+            self.enableDnsLog = False
+        else:
+            self.enableDnsLog = True
+
         conn = self.getMysqlConn()
 
         cur = conn.cursor()
@@ -642,6 +649,9 @@ class DbTransfer(object):
             user_id = row['id']
             passwd = common.to_bytes(row['passwd'])
             cfg = {'password': passwd}
+            cfg['user_id'] = user_id
+
+            cfg['enable_DnsLog'] = self.enableDnsLog
 
             read_config_keys = [
                 'method',
