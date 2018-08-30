@@ -652,6 +652,11 @@ class DbTransfer(object):
 
             if 'enable_DnsLog' not in cfg:
                 cfg['enable_DnsLog'] = self.enableDnsLog
+            else:
+                if cfg['enable_DnsLog'] == 1:
+                    cfg['enable_DnsLog'] = True
+                else:
+                    cfg['enable_DnsLog'] = False
 
             read_config_keys = [
                 'method',
@@ -663,7 +668,8 @@ class DbTransfer(object):
                 'forbidden_port',
                 'node_speedlimit',
                 'disconnect_ip',
-                'is_multi_user']
+                'is_multi_user'
+            ]
 
             for name in read_config_keys:
                 if name in row and row[name]:
@@ -675,8 +681,7 @@ class DbTransfer(object):
                     try:
                         cfg[name] = cfg[name].encode('utf-8')
                     except Exception as e:
-                        logging.warning(
-                            'encode cfg key "%s" fail, val "%s"' % (name, cfg[name]))
+                        logging.warning( 'encode cfg key "%s" fail, val "%s"' % (name, cfg[name]) )
 
             if 'node_speedlimit' in cfg:
                 if float(
