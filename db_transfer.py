@@ -49,7 +49,7 @@ class DbTransfer(object):
 
         self.has_stopped = False
 
-        self.enableDnsLog = True
+        self.enable_dnsLog = True
 
     def getMysqlConn(self):
         import cymysql
@@ -480,9 +480,9 @@ class DbTransfer(object):
             keys, user_method_keys = switchrule.getPortGroupKeys()['user'], switchrule.getPortGroupKeys()['user_method']
 
         if get_config().ENABLE_DNSLOG == 0:
-            self.enableDnsLog = False
+            self.enable_dnsLog = False
         else:
-            self.enableDnsLog = True
+            self.enable_dnsLog = True
 
         conn = self.getMysqlConn()
 
@@ -661,20 +661,20 @@ class DbTransfer(object):
                 'node_speedlimit',
                 'disconnect_ip',
                 'is_multi_user',
-                'enable_DnsLog'
+                'enable_dnsLog'
             ]
 
             for name in read_config_keys:
                 if name in row and row[name]:
                     cfg[name] = row[name]
 
-            if 'enable_DnsLog' not in cfg:
-                cfg['enable_DnsLog'] = self.enableDnsLog
+            if 'enable_dnsLog' not in cfg:
+                cfg['enable_dnsLog'] = self.enable_dnsLog
             else:
-                if cfg['enable_DnsLog'] == 1:
-                    cfg['enable_DnsLog'] = True
+                if cfg['enable_dnsLog'] == 1:
+                    cfg['enable_dnsLog'] = True
                 else:
-                    cfg['enable_DnsLog'] = False
+                    cfg['enable_dnsLog'] = False
 
             merge_config_keys = ['password'] + read_config_keys
             for name in cfg.keys():

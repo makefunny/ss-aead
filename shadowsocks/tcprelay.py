@@ -973,9 +973,9 @@ class TCPRelayHandler(object):
                                     if self._server.is_cleaning_detect_log == False and id not in self._server.detect_log_list:
                                         self._server.detect_log_list.append(id)
                                 self._handle_detect_rule_match(remote_port)
-                                if self._config['enable_DnsLog']:
+                                if self._config['enable_dnsLog']:
                                     try:
-                                        self.logger.detected( 'DNS: %s, user_id: %d, server_port: %d, client ip: %s' % (common.to_str(remote_addr), self._config['user_id'], self._server._listen_port, common.getRealIp(self._client_address[0]))  )
+                                        self.logger.detected( 'user_id: %d, DNS: %s, server_port: %d, client ip: %s' % (self._config['user_id'], common.to_str(remote_addr), self._server._listen_port, common.getRealIp(self._client_address[0]))  )
                                     except Exception as e:
                                         logging.error('DNS log error: %s', str(e))
                                 raise Exception(
@@ -989,9 +989,9 @@ class TCPRelayHandler(object):
                                     )
                                 )
                             else:
-                                if self._config['enable_DnsLog']:
+                                if self._config['enable_dnsLog']:
                                     try:
-                                        self.logger.info( 'DNS: %s, user_id: %d, server_port: %d, client ip: %s' % (common.to_str(remote_addr), self._config['user_id'], self._server._listen_port, common.getRealIp(self._client_address[0]))  )
+                                        self.logger.info( 'user_id: %d, DNS: %s, server_port: %d, client ip: %s' % (self._config['user_id'], common.to_str(remote_addr), self._server._listen_port, common.getRealIp(self._client_address[0]))  )
                                     except Exception as e:
                                         logging.error('DNS log error: %s', str(e))
                     # remote_addr => what is hex type?
