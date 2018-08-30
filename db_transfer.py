@@ -252,8 +252,7 @@ class DbTransfer(object):
 
     def load(self):
         import os
-        return os.popen(
-            "cat /proc/loadavg | awk '{ print $1\" \"$2\" \"$3 }'").readlines()[0][:-2]
+        return os.popen("cat /proc/loadavg | awk '{ print $1\" \"$2\" \"$3 }'").readlines()[0][:-2]
 
     def trafficShow(self, Traffic):
         if Traffic < 1024:
@@ -531,12 +530,12 @@ class DbTransfer(object):
             port_mysql_str = port_range.getPortRangeMysqlStrForPortGroup()
             print(port_mysql_str)
             cur = conn.cursor()
-            execute_s = "SELECT a.`" + '`,a.`'.join(keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
+            execute_str = "SELECT a.`" + '`,a.`'.join(keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
                 "` FROM user a,user_method b WHERE ( (a.`class`>=" + str(nodeinfo[1]) + " " + node_group_sql + ") OR a.`is_admin`=1 ) " + \
                 "AND a.`enable`=1 AND a.`expire_in`>now() AND a.`transfer_enable`>a.`u`+a.`d` AND b.`node_id`='" + str(get_config().NODE_ID) + "' " + \
                 "AND a.`id`=b.`user_id` " + \
                 port_mysql_str
-            cur.execute(execute_s)
+            cur.execute(execute_str)
             keys += user_method_keys
 
         rows = []
@@ -651,7 +650,8 @@ class DbTransfer(object):
             cfg = {'password': passwd}
             cfg['user_id'] = user_id
 
-            cfg['enable_DnsLog'] = self.enableDnsLog
+            if 'enable_DnsLog' not in cfg:
+                cfg['enable_DnsLog'] = self.enableDnsLog
 
             read_config_keys = [
                 'method',

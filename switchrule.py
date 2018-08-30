@@ -24,12 +24,17 @@ def getKeys():
 
 def getPortGroupKeys():
     keys_dict = {}
-    keys_dict['user'] = ['id', 'u', 'd', 'transfer_enable', 'enable',
+    keys_dict['user'] = [
+        'id', 'u', 'd', 'transfer_enable', 'enable',
         'node_speedlimit',
         'forbidden_ip', 'forbidden_port', 'disconnect_ip',
         'is_multi_user'
     ]
-    keys_dict['user_method'] = ['passwd','method','protocol','protocol_param','obfs','obfs_param','port']
+    keys_dict['user_method'] = [
+        'port', 'passwd', 'method',
+        'protocol', 'protocol_param', 'obfs', 'obfs_param',
+        'traffic_rate', 'node_speedlimit', 'enable_dnsLog'
+    ]
     return keys_dict
 
 def isTurnOn(row):
