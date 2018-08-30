@@ -650,14 +650,6 @@ class DbTransfer(object):
             cfg = {'password': passwd}
             cfg['user_id'] = user_id
 
-            if 'enable_DnsLog' not in cfg:
-                cfg['enable_DnsLog'] = self.enableDnsLog
-            else:
-                if cfg['enable_DnsLog'] == 1:
-                    cfg['enable_DnsLog'] = True
-                else:
-                    cfg['enable_DnsLog'] = False
-
             read_config_keys = [
                 'method',
                 'obfs',
@@ -668,12 +660,21 @@ class DbTransfer(object):
                 'forbidden_port',
                 'node_speedlimit',
                 'disconnect_ip',
-                'is_multi_user'
+                'is_multi_user',
+                'enable_DnsLog'
             ]
 
             for name in read_config_keys:
                 if name in row and row[name]:
                     cfg[name] = row[name]
+
+            if 'enable_DnsLog' not in cfg:
+                cfg['enable_DnsLog'] = self.enableDnsLog
+            else:
+                if cfg['enable_DnsLog'] == 1:
+                    cfg['enable_DnsLog'] = True
+                else:
+                    cfg['enable_DnsLog'] = False
 
             merge_config_keys = ['password'] + read_config_keys
             for name in cfg.keys():
