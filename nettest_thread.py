@@ -47,7 +47,7 @@ class TCPing():
     def blocked(self, checkList):
         if not checkList:
             checkList = self.checkList
-        for num in range(len(len(checkList))):
+        for num in range(len(checkList)):
             t = threading.Thread( target=self.tcping, args=[checkList[num]] )
             t.start()
         while True:
