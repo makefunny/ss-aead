@@ -11,16 +11,65 @@ import importloader
 import cymysql
 import subprocess
 import socket
+import threading
 from shadowsocks import common, shell
+
+class TCPing():
+    def __init__(self):
+        self.status = []
+        self.checkList = [
+            ('www.foshan.gov.cn',80),
+            ('www.sz.gov.cn',80),
+            ('www.gz.gov.cn',80)
+        ]
+
+    def clearStatus(self):
+        if self.status != []:
+            self.status = []
+
+    def tcping(self, ip_port):
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        t_start = round(time.time()*1000)
+        try:
+            s.settimeout(1)
+            s.connect(ip_port)
+            s.shutdown(socket.SHUT_RD)
+            t_end = round(time.time()*1000)
+            s.settimeout(None)
+            self.status.append(-1)
+            # print( (t_end-t_start), "ms" )
+            # s.close()
+        except Exception as e:
+            s.settimeout(None)
+            self.status.append(1)
+            # print('[failed] timeout')
+
+    def blocked(self, checkList):
+        if not checkList:
+            checkList = self.checkList
+        for num in range(len(len(checkList))):
+            t = threading.Thread( target=self.tcping, args=[checkList[num]] )
+            t.start()
+        while True:
+            if len(self.status)==len(checkList):
+                break
+        j = 0
+        for i in self.status:
+            if i == 1:
+                j = j+1
+        self.clearStatus()
+        if j == len(checkList):
+            return True
+        return False
 
 class Nettest(object):
 
     def __init__(self):
-        import threading
         self.event = threading.Event()
         self.has_stopped = False
         self.blocked = None
         self.blocked_changed = False
+        self.TCPing = TCPing()
 
     def nettest_thread(self):
         if self.event.wait(1):
@@ -50,73 +99,9 @@ class Nettest(object):
                 charset='utf8')
         conn.autocommit(True)
 
-        def speed():
-            rx0 = 0; tx0 = 0; rx1 = 0; tx1 = 0
-            for name, stats in psutil.net_io_counters(pernic=True).items():
-                if name == "lo" or name.find("tun") > -1:
-                    continue
-                rx0 += stats.bytes_recv
-                tx0 += stats.bytes_sent
-            time.sleep(1)
-            for name, stats in psutil.net_io_counters(pernic=True).items():
-                if name == "lo" or name.find("tun") > -1:
-                    continue
-                rx1 += stats.bytes_recv
-                tx1 += stats.bytes_sent
-            speed1=[]
-            speed1.append(rx1 - rx0)
-            speed1.append(tx1 - tx0)
-            return speed1
-
-        def list2str(n):
-            testlist = ""
-            i = 0
-            for r in n:
-                if i == 0:
-                    testlist = str(r)
-                elif i <= len(n):
-                    testlist += " " + str(r)
-                i += 1
-            return testlist
-
-        def gettcping(ip_port):
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            t_start = round(time.time()*1000)
-            try:
-                s.settimeout(1)
-                s.connect(ip_port)
-                s.shutdown(socket.SHUT_RD)
-                t_end = round(time.time()*1000)
-                s.settimeout(None)
-                return str(t_end-t_start)+"ms"
-            except Exception as e:
-                s.settimeout(None)
-                return "timeout"
-
-        def getmyping(ip):
-            laytency = subprocess.Popen(["ping -c 1 " + ip + ' | grep "time="'], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, close_fds=True)
-            try:
-                stdout, stderr = laytency.communicate(timeout=2)
-                stdout = str(stdout).split("=")[3].replace("\\n","").replace(" ","").replace("'","")
-                return stdout
-            except subprocess.TimeoutExpired as e:
-                laytency.kill()
-                return "timeout"
-
-        def getpinglist():
+        def getTcpingList():
             cur = conn.cursor()
-            cur.execute("SELECT `id`,`ip` FROM `test_ip` where `ip` != ''")
-            n=[]
-            for r in cur.fetchall():
-                r = list(r)
-                n.append(r[0])
-                n.append(getmyping(r[1]))
-            cur.close()
-            return n
-
-        def gettcpinglist():
-            cur = conn.cursor()
-            cur.execute("SELECT `id`,`ip`,`port` FROM `test_ip` where `ip` != ''")
+            cur.execute("SELECT `id`,`ip`,`port` FROM `test_ip` WHERE `ip` != '' LIMIT 3")
             n=[]
             for r in cur.fetchall():
                 r = list(r)
@@ -124,43 +109,6 @@ class Nettest(object):
                 n.append(gettcping( (r[1],int(r[2])) ))
             cur.close()
             return n
-
-        def tcping(ip_port):
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            t_start = round(time.time()*1000)
-            try:
-                s.settimeout(1)
-                s.connect(ip_port)
-                s.shutdown(socket.SHUT_RD)
-                t_end = round(time.time()*1000)
-                s.settimeout(None)
-                # return (t_end-t_start)
-                return 0
-                # s.close()
-            except Exception as e:
-                s.settimeout(None)
-                return 1
-
-        def get_ip_port():
-            cur = conn.cursor()
-            cur.execute("SELECT `ip`,`port` FROM `test_ip` where `ip` != ''")
-            ip_port = cur.fetchone()
-            cur.close()
-            return ip_port
-
-        def checkblock(ip_port):
-            # 1 => blocked
-            # 0 => not blocked
-            if tcping(ip_port) == 1:
-                if tcping(ip_port) == 1:
-                    if tcping(ip_port) == 1:
-                        return 1
-                    else:
-                        return 0
-                else:
-                    return 0
-            else:
-                return 0
 
         def set_block_status():
             if self.blocked is None:
@@ -174,24 +122,22 @@ class Nettest(object):
                 cur.close()
 
         def check_and_update():
-            ip_port = get_ip_port()
+            checkList = getTcpingList()
             set_block_status()
-            #print(config)
-            
             if self.blocked == True:
-                if checkblock(ip_port) == 0:
+                if not self.TCPing.blocked(checkList):
                     time.sleep(2)
-                    if checkblock(ip_port) == 0:
+                    if not self.TCPing.blocked(checkList):
                         time.sleep(2)
-                        if checkblock(ip_port) == 0:
+                        if not self.TCPing.blocked(checkList):
                             self.blocked = False
                             self.blocked_changed = True
             else:
-                if checkblock(ip_port) == 1:
+                if self.TCPing.blocked(checkList):
                     time.sleep(2)
-                    if checkblock(ip_port) == 1:
+                    if self.TCPing.blocked(checkList):
                         time.sleep(2)
-                        if checkblock(ip_port) == 1:
+                        if self.TCPing.blocked(checkList):
                             self.blocked = True
                             self.blocked_changed = True
 
