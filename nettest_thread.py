@@ -105,8 +105,7 @@ class Nettest(object):
             n=[]
             for r in cur.fetchall():
                 r = list(r)
-                n.append(r[0])
-                n.append(gettcping( (r[1],int(r[2])) ))
+                n.append( (r[1],int(r[2])) )
             cur.close()
             return n
 
