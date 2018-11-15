@@ -2,7 +2,7 @@ from configloader import load_config, get_config
 
 
 def getKeys():
-    key_list = ['id', 'port', 'u', 'd', 'transfer_enable', 'passwd', 'enable']
+    key_list = ['id', 'port', 'passwd', 'enable']
     if get_config().API_INTERFACE == 'sspanelv3':
         key_list += ['method']
     elif get_config().API_INTERFACE == 'sspanelv3ssr':
@@ -25,7 +25,7 @@ def getKeys():
 def getPortGroupKeys():
     keys_dict = {}
     keys_dict['user'] = [
-        'id', 'u', 'd', 'transfer_enable', 'enable',
+        'id', 'enable',
         'node_speedlimit',
         'forbidden_ip', 'forbidden_port', 'disconnect_ip',
         'is_multi_user'
@@ -33,7 +33,7 @@ def getPortGroupKeys():
     keys_dict['user_method'] = [
         'port', 'passwd', 'method',
         'protocol', 'protocol_param', 'obfs', 'obfs_param',
-        'traffic_rate', 'node_speedlimit', 'enable_dnsLog'
+        'enable_dnsLog'
     ]
     return keys_dict
 

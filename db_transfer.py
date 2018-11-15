@@ -26,8 +26,12 @@ class DbTransfer(object):
         import threading
         self.last_update_transfer = {}
         self.event = threading.Event()
+        # 通过端口存储用户id
         self.port_uid_table = {}
+        # 通过用户id存储端口
         self.uid_port_table = {}
+        # 通过用户id存储流量包id
+        self.uid_productid_table = {}
         self.node_speedlimit = 0.00
         self.traffic_rate = 0.0
 
@@ -80,7 +84,8 @@ class DbTransfer(object):
         import cymysql
         update_transfer = {}
 
-        query_head = 'UPDATE user'
+        # 同一用户可有多个产品，故以产品id为线索更新流量
+        query_head = 'UPDATE user_product_traffic'
         query_sub_when = ''
         query_sub_when2 = ''
         query_sub_in = None
@@ -94,10 +99,10 @@ class DbTransfer(object):
             if dt_transfer[id][0] == 0 and dt_transfer[id][1] == 0:
                 continue
 
-            query_sub_when += ' WHEN %s THEN u+%s' % (
-                self.port_uid_table[id], dt_transfer[id][0] * self.traffic_rate)
-            query_sub_when2 += ' WHEN %s THEN d+%s' % (
-                self.port_uid_table[id], dt_transfer[id][1] * self.traffic_rate)
+            query_sub_when += ' WHEN %s THEN traffic_flow_used_up+%s' % (
+                self.uid_productid_table[id], dt_transfer[id][0] * self.traffic_rate)
+            query_sub_when2 += ' WHEN %s THEN traffic_flow_used_dl+%s' % (
+                self.uid_productid_table[id], dt_transfer[id][1] * self.traffic_rate)
             update_transfer[id] = dt_transfer[id]
 
             alive_user_count = alive_user_count + 1
@@ -124,13 +129,13 @@ class DbTransfer(object):
                 (dt_transfer[id][0] + dt_transfer[id][1])
 
             if query_sub_in is not None:
-                query_sub_in += ',%s' % self.port_uid_table[id]
+                query_sub_in += ',%s' % self.uid_productid_table[id]
             else:
-                query_sub_in = '%s' % self.port_uid_table[id]
+                query_sub_in = '%s' % self.uid_productid_table[id]
         if query_sub_when != '':
-            query_sql = query_head + ' SET u = CASE id' + query_sub_when + \
-                ' END, d = CASE id' + query_sub_when2 + \
-                ' END, t = unix_timestamp() ' + \
+            query_sql = query_head + ' SET traffic_flow_used_up = CASE id' + query_sub_when + \
+                ' END, traffic_flow_used_dl = CASE id' + query_sub_when2 + \
+                ' END, last_use_time = unix_timestamp() ' + \
                 ' WHERE id IN (%s)' % query_sub_in
 
             cur = conn.cursor()
@@ -511,33 +516,35 @@ class DbTransfer(object):
             self.is_relay = False
 
         if get_config().PORT_GROUP == 0:
-            if nodeinfo[0] == 0:
-                node_group_sql = ""
-            else:
-                node_group_sql = "AND `node_group`=" + str(nodeinfo[0])
+            # if nodeinfo[0] == 0:
+            #     node_group_sql = ""
+            # else:
+            #     node_group_sql = "AND `node_group`=" + str(nodeinfo[0])
             import port_range
             port_mysql_str = port_range.getPortRangeMysqlStr()
             cur = conn.cursor()
-            cur.execute("SELECT " + ','.join(keys) +
-                        " FROM user WHERE ( (`class`>=" + str(nodeinfo[1]) + " " + node_group_sql + ") OR `is_admin`=1 ) \
-                        AND `enable`=1 AND `expire_in`>now() AND `transfer_enable`>`u`+`d`" + port_mysql_str)
+            cur.execute("SELECT a." + ',a.'.join(keys) + ",c.traffic_flow as transfer_enable,c.traffic_flow_used_up as u,c.traffic_flow_used_dl as d,c.id as productid" + 
+                        " FROM user a,user_product_traffic c WHERE a.`id`=c.`user_id` AND c.`status`=2 AND ( c.`expire_time`>unix_timestamp() OR a.`is_admin`=1 ) \
+                        AND a.`enable`=1 AND a.`expire_in`>now() AND c.`traffic_flow`>c.`traffic_flow_used_up`+c.`traffic_flow_used_dl` AND c.`node_group`=" + str(nodeinfo[0]) + port_mysql_str
+                        )
         elif get_config().PORT_GROUP == 1:
-            if nodeinfo[0] == 0:
-                node_group_sql = ""
-            else:
-                node_group_sql = "AND a.`node_group`=" + str(nodeinfo[0])
+            # if nodeinfo[0] == 0:
+            #     node_group_sql = ""
+            # else:
+            #     node_group_sql = "AND a.`node_group`=" + str(nodeinfo[0])
             import port_range
             port_mysql_str = port_range.getPortRangeMysqlStrForPortGroup()
             print(port_mysql_str)
             cur = conn.cursor()
             execute_str = "SELECT a.`" + '`,a.`'.join(keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
-                "` FROM user a,user_method b WHERE ( (a.`class`>=" + str(nodeinfo[1]) + " " + node_group_sql + ") OR a.`is_admin`=1 ) " + \
-                "AND a.`enable`=1 AND a.`expire_in`>now() AND a.`transfer_enable`>a.`u`+a.`d` AND b.`node_id`='" + str(get_config().NODE_ID) + "' " + \
-                "AND a.`id`=b.`user_id` " + \
+                "`,c.traffic_flow as transfer_enable,c.traffic_flow_used_up as u,c.traffic_flow_used_dl as d,c.id as productid FROM user a,user_method b,user_product_traffic c WHERE ( c.`expire_time`>unix_timestamp() OR a.`is_admin`=1 ) " + \
+                "AND a.`enable`=1 AND a.`expire_in`>now() AND b.`node_id`='" + str(get_config().NODE_ID) + "' " + \
+                "AND a.`id`=b.`user_id` AND c.`status`=2 AND a.`id`=c.`user_id` AND c.`traffic_flow`>c.`traffic_flow_used_up`+c.`traffic_flow_used_dl` AND c.`node_group`=" + str(nodeinfo[0]) + \
                 port_mysql_str
             cur.execute(execute_str)
             keys += user_method_keys
-
+        # 按顺序来
+        keys += ['transfer_enable', 'u', 'd', 'productid']
         rows = []
         for r in cur.fetchall():
             d = {}
@@ -545,6 +552,7 @@ class DbTransfer(object):
                 d[keys[column]] = r[column]
             rows.append(d)
         cur.close()
+        print(rows[0])
 
         # 读取节点IP
         # SELECT * FROM `ss_node`  where `node_ip` != ''
@@ -632,6 +640,7 @@ class DbTransfer(object):
         for row in rows:
             self.port_uid_table[row['port']] = row['id']
             self.uid_port_table[row['id']] = row['port']
+            self.uid_productid_table[row['id']] = row['productid']
 
         if self.mu_only == 1:
             i = 0

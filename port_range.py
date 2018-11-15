@@ -46,7 +46,7 @@ def getPortRangeMysqlStr():
         l = get_config().PORT_NOT_ALLOW_LIST
         port_not_allow_mysql_str = ""
         for i in l:
-            port_not_allow_mysql_str += " AND `port`!="
+            port_not_allow_mysql_str += " AND `a.port`!="
             port_not_allow_mysql_str += str(i)
     else:
         port_not_allow_mysql_str = ""
@@ -54,9 +54,9 @@ def getPortRangeMysqlStr():
     if len(get_config().PORT_ALLOW_RANGE)==2:
         l = get_config().PORT_ALLOW_RANGE
         port_allow_range_mysql_str = ""
-        port_allow_range_mysql_str += " AND `port`>="
+        port_allow_range_mysql_str += " AND `a.port`>="
         port_allow_range_mysql_str += str(l[0])
-        port_allow_range_mysql_str += " AND `port`<="
+        port_allow_range_mysql_str += " AND `a.port`<="
         port_allow_range_mysql_str += str(l[1])
     else:
         port_allow_range_mysql_str = ""
@@ -64,9 +64,9 @@ def getPortRangeMysqlStr():
     if len(get_config().PORT_NOT_ALLOW_RANGE)==2:
         l = get_config().PORT_NOT_ALLOW_RANGE
         port_not_allow_range_mysql_str = ""
-        port_not_allow_range_mysql_str += " AND (`port`<"
+        port_not_allow_range_mysql_str += " AND (`a.port`<"
         port_not_allow_range_mysql_str += str(l[0])
-        port_not_allow_range_mysql_str += " OR `port`>"
+        port_not_allow_range_mysql_str += " OR `a.port`>"
         port_not_allow_range_mysql_str += str(l[1])
         port_not_allow_range_mysql_str += ")"
     else:

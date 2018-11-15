@@ -5,7 +5,6 @@ import logging
 import time
 import sys
 import os
-import psutil
 import configloader
 import importloader
 import cymysql

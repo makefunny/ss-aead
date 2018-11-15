@@ -19,7 +19,8 @@ class TestConnect():
         if get_config().API_INTERFACE == 'modwebapi':
             self.checkWebApi()
         else:
-            self.checkMysql()
+            # self.checkMysql()
+            self.checkMysql_newVer()
 
     def setMysqlConn(self, db_base=None):
         import cymysql
@@ -129,6 +130,24 @@ class TestConnect():
 
         cur.close()
 
+        print()
+        self.mysql_conn.close()
+
+    def checkMysql_newVer(self):
+        self.checkMysqlPort()
+
+        self.setMysqlConn('ccavsorg')
+        cur = self.mysql_conn.cursor()
+
+        try:
+            cur.execute("SELECT * FROM `user_product_traffic` WHERE `expire_time`>unix_timestamp()")
+            re = cur.fetchall()
+            print(len(re))
+        except Exception as e:
+            print('[Failed]', e)
+
+
+        cur.close()
         print()
         self.mysql_conn.close()
 
