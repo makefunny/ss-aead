@@ -100,9 +100,9 @@ class DbTransfer(object):
                 continue
 
             query_sub_when += ' WHEN %s THEN traffic_flow_used_up+%s' % (
-                self.uid_productid_table[id], dt_transfer[id][0] * self.traffic_rate)
+                self.uid_productid_table[self.port_uid_table[id]], dt_transfer[id][0] * self.traffic_rate)
             query_sub_when2 += ' WHEN %s THEN traffic_flow_used_dl+%s' % (
-                self.uid_productid_table[id], dt_transfer[id][1] * self.traffic_rate)
+                self.uid_productid_table[self.port_uid_table[id]], dt_transfer[id][1] * self.traffic_rate)
             update_transfer[id] = dt_transfer[id]
 
             alive_user_count = alive_user_count + 1
@@ -129,9 +129,9 @@ class DbTransfer(object):
                 (dt_transfer[id][0] + dt_transfer[id][1])
 
             if query_sub_in is not None:
-                query_sub_in += ',%s' % self.uid_productid_table[id]
+                query_sub_in += ',%s' % self.uid_productid_table[self.port_uid_table[id]]
             else:
-                query_sub_in = '%s' % self.uid_productid_table[id]
+                query_sub_in = '%s' % self.uid_productid_table[self.port_uid_table[id]]
         if query_sub_when != '':
             query_sql = query_head + ' SET traffic_flow_used_up = CASE id' + query_sub_when + \
                 ' END, traffic_flow_used_dl = CASE id' + query_sub_when2 + \
