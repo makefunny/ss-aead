@@ -524,8 +524,8 @@ class DbTransfer(object):
             port_mysql_str = port_range.getPortRangeMysqlStr()
             cur = conn.cursor()
             cur.execute("SELECT a." + ',a.'.join(keys) + ",c.traffic_flow as transfer_enable,c.traffic_flow_used_up as u,c.traffic_flow_used_dl as d,c.id as productid" + 
-                        " FROM user a,user_product_traffic c WHERE a.`id`=c.`user_id` AND c.`status`=2 AND ( c.`expire_time`>unix_timestamp() OR a.`is_admin`=1 ) \
-                        AND a.`enable`=1 AND a.`expire_in`>now() AND c.`traffic_flow`>c.`traffic_flow_used_up`+c.`traffic_flow_used_dl` AND c.`node_group`=" + str(nodeinfo[0]) + port_mysql_str
+                        " FROM user a,user_product_traffic c WHERE a.`id`=c.`user_id` AND c.`status`=2 AND ( c.`expire_time`=-1 OR c.`expire_time`>unix_timestamp() OR a.`is_admin`=1 ) \
+                        AND a.`enable`=1 AND a.`expire_in`>now() AND (c.`traffic_flow`>c.`traffic_flow_used_up`+c.`traffic_flow_used_dl` OR c.`traffic_flow`=-1) AND c.`node_group`=" + str(nodeinfo[0]) + port_mysql_str
                         )
         elif get_config().PORT_GROUP == 1:
             # if nodeinfo[0] == 0:
@@ -537,9 +537,9 @@ class DbTransfer(object):
             print(port_mysql_str)
             cur = conn.cursor()
             execute_str = "SELECT a.`" + '`,a.`'.join(keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
-                "`,c.traffic_flow as transfer_enable,c.traffic_flow_used_up as u,c.traffic_flow_used_dl as d,c.id as productid FROM user a,user_method b,user_product_traffic c WHERE ( c.`expire_time`>unix_timestamp() OR a.`is_admin`=1 ) " + \
+                "`,c.traffic_flow as transfer_enable,c.traffic_flow_used_up as u,c.traffic_flow_used_dl as d,c.id as productid FROM user a,user_method b,user_product_traffic c WHERE ( c.`expire_time`=-1 OR c.`expire_time`>unix_timestamp() OR a.`is_admin`=1 ) " + \
                 "AND a.`enable`=1 AND a.`expire_in`>now() AND b.`node_id`='" + str(get_config().NODE_ID) + "' " + \
-                "AND a.`id`=b.`user_id` AND c.`status`=2 AND a.`id`=c.`user_id` AND c.`traffic_flow`>c.`traffic_flow_used_up`+c.`traffic_flow_used_dl` AND c.`node_group`=" + str(nodeinfo[0]) + \
+                "AND a.`id`=b.`user_id` AND c.`status`=2 AND a.`id`=c.`user_id` AND (c.`traffic_flow`>c.`traffic_flow_used_up`+c.`traffic_flow_used_dl` OR c.`traffic_flow`=-1) AND c.`node_group`=" + str(nodeinfo[0]) + \
                 port_mysql_str
             cur.execute(execute_str)
             keys += user_method_keys
