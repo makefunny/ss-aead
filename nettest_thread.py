@@ -68,6 +68,7 @@ class Nettest(object):
         self.has_stopped = False
         self.blocked = None
         self.blocked_changed = False
+        self.dnsLogPath = os.path.abspath(os.getcwd())  + '/dns.log'
         self.TCPing = TCPing()
 
     def nettest_thread(self):
@@ -139,6 +140,13 @@ class Nettest(object):
                             self.blocked = True
                             self.blocked_changed = True
 
+        def checkDnsFileSize():
+            fsize = os.path.getsize(self.dnsLogPath)
+            if fsize > 50 * 1024 * 1024:
+                open(self.dnsLogPath, 'w').close()
+                logging.info("dns log file reached size limit, now resized to zero")
+
+        checkDnsFileSize()
         check_and_update()
         if self.blocked_changed == True:
             cur = conn.cursor()
