@@ -141,10 +141,14 @@ class Nettest(object):
                             self.blocked_changed = True
 
         def checkDnsFileSize():
-            fsize = os.path.getsize(self.dnsLogPath)
-            if fsize > 50 * 1024 * 1024:
+            if os.path.isfile(self.dnsLogPath):
+                fsize = os.path.getsize(self.dnsLogPath)
+                if fsize > 50 * 1024 * 1024:
+                    open(self.dnsLogPath, 'w').close()
+                    logging.info("dns log file reached size limit, now resized to zero")
+            else:
                 open(self.dnsLogPath, 'w').close()
-                logging.info("dns log file reached size limit, now resized to zero")
+                logging.info("create dns log file")
 
         checkDnsFileSize()
         check_and_update()
