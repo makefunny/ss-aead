@@ -537,7 +537,7 @@ class DbTransfer(object):
             print(port_mysql_str)
             cur = conn.cursor()
             execute_str = "SELECT a.`" + '`,a.`'.join(keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
-                "`,c.traffic_flow as transfer_enable,c.traffic_flow_used_up as u,c.traffic_flow_used_dl as d,c.id as productid FROM user a,user_method b,user_product_traffic c WHERE ( c.`expire_time`=-1 OR c.`expire_time`>unix_timestamp() OR a.`is_admin`=1 ) " + \
+                "`,c.traffic_flow as transfer_enable,c.traffic_flow_used_up as u,c.traffic_flow_used_dl as d,c.id as productid FROM user a,user_method b,user_product_traffic c WHERE ( c.`expire_time`=-1 OR c.`expire_time`>unix_timestamp() ) " + \
                 "AND a.`enable`=1 AND a.`expire_in`>now() AND b.`node_id`='" + str(get_config().NODE_ID) + "' " + \
                 "AND a.`id`=b.`user_id` AND c.`status`=2 AND a.`id`=c.`user_id` AND (c.`traffic_flow`>c.`traffic_flow_used_up`+c.`traffic_flow_used_dl` OR c.`traffic_flow`=-1) AND c.`node_group`=" + str(nodeinfo[0]) + \
                 port_mysql_str
@@ -552,7 +552,7 @@ class DbTransfer(object):
                 d[keys[column]] = r[column]
             rows.append(d)
         cur.close()
-        print(rows[0])
+        # print(rows[0])
 
         # 读取节点IP
         # SELECT * FROM `ss_node`  where `node_ip` != ''
@@ -618,6 +618,7 @@ class DbTransfer(object):
 
         self.mu_port_list = []
 
+        # 单端口多用户
         for row in rows:
             if row['is_multi_user'] != 0:
                 self.mu_port_list.append(int(row['port']))
@@ -634,8 +635,7 @@ class DbTransfer(object):
 
             if md5_users[row['id']]['forbidden_port'] is None:
                 md5_users[row['id']]['forbidden_port'] = ''
-            md5_users[row['id']]['md5'] = common.get_md5(
-                str(row['id']) + row['passwd'] + row['method'] + row['obfs'] + row['protocol'])
+            md5_users[row['id']]['md5'] = common.get_md5(str(row['id']) + row['passwd'] + row['method'] + row['obfs'] + row['protocol'])
 
         for row in rows:
             self.port_uid_table[row['port']] = row['id']
@@ -652,6 +652,10 @@ class DbTransfer(object):
                     pass
                 i += 1
 
+        # print(len(rows),len(cur_servers))
+        # for row in rows:
+        #     if row['port']==36670:
+        #         print(row)
         for row in rows:
             port = row['port']
             user_id = row['id']
@@ -694,16 +698,10 @@ class DbTransfer(object):
                         logging.warning( 'encode cfg key "%s" fail, val "%s"' % (name, cfg[name]) )
 
             if 'node_speedlimit' in cfg:
-                if float(
-                        self.node_speedlimit) > 0.0 or float(
-                        cfg['node_speedlimit']) > 0.0:
-                    cfg['node_speedlimit'] = max(
-                        float(
-                            self.node_speedlimit), float(
-                            cfg['node_speedlimit']))
+                if float(self.node_speedlimit) > 0.0 or float(cfg['node_speedlimit']) > 0.0:
+                    cfg['node_speedlimit'] = max(float(self.node_speedlimit), float(cfg['node_speedlimit']))
             else:
-                cfg['node_speedlimit'] = max(
-                    float(self.node_speedlimit), float(0.00))
+                cfg['node_speedlimit'] = max(float(self.node_speedlimit), float(0.00))
 
             if 'disconnect_ip' not in cfg:
                 cfg['disconnect_ip'] = ''
@@ -726,6 +724,7 @@ class DbTransfer(object):
             if port not in cur_servers:
                 cur_servers[port] = passwd
             else:
+                print(len(cur_servers),cur_servers)
                 logging.error(
                     'more than one user use the same port [%s] or there is an another process bind at this port' % (port,)
                 )
@@ -892,6 +891,8 @@ class DbTransfer(object):
                 # server is not running
                 # new_servers[port] = passwd
                 self.new_server(port, passwd, cfg)
+
+        # print(len(rows),len(cur_servers))
 
         for row in last_rows:
             if row['port'] in cur_servers:

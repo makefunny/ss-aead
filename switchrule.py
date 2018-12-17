@@ -33,7 +33,7 @@ def getPortGroupKeys():
     keys_dict['user_method'] = [
         'port', 'passwd', 'method',
         'protocol', 'protocol_param', 'obfs', 'obfs_param',
-        'enable_dnsLog'
+        'enable_dnsLog', 'node_speedlimit'
     ]
     return keys_dict
 
