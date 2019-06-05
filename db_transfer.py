@@ -570,22 +570,25 @@ class DbTransfer(object):
         # mu用户，选择usermethod，不选择porduct
         # 同样受portrange影响？
         # productid 设为 -1
-        execute_str = "SELECT a.`" + '`,a.`'.join(mu_keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
-                "` FROM user a,user_method b WHERE " + \
-                "a.`enable`=1 AND a.`expire_in`>now() AND b.`node_id`='" + str(get_config().NODE_ID) + "' " + \
-                "AND a.`id`=b.`user_id` AND a.`is_multi_user`<>0 " +  \
-                port_mysql_str
-        if get_config().PORT_GROUP == 1:
+
+        if get_config().PORT_GROUP == 0:
+            pass
+        elif get_config().PORT_GROUP == 1:
+            execute_str = "SELECT a.`" + '`,a.`'.join(mu_keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
+                    "` FROM user a,user_method b WHERE " + \
+                    "a.`enable`=1 AND a.`expire_in`>now() AND b.`node_id`='" + str(get_config().NODE_ID) + "' " + \
+                    "AND a.`id`=b.`user_id` AND a.`is_multi_user`<>0 " +  \
+                    port_mysql_str
             mu_keys += user_method_keys
-        # print(execute_str)
-        cur.execute(execute_str)
-        for r in cur.fetchall():
-            d = {}
-            for column in range(len(mu_keys)):
-                d[mu_keys[column]] = r[column]
-            d['productid'] = -1
-            # print('d',d)
-            rows.append(d)
+            # print(execute_str)
+            cur.execute(execute_str)
+            for r in cur.fetchall():
+                d = {}
+                for column in range(len(mu_keys)):
+                    d[mu_keys[column]] = r[column]
+                d['productid'] = -1
+                # print('d',d)
+                rows.append(d)
         cur.close()
         # print(rows)
 
