@@ -1,4 +1,4 @@
-﻿#!/usr/bin/python
+#!/usr/bin/python
 # -*- coding: UTF-8 -*-
 
 import logging
@@ -549,7 +549,7 @@ class DbTransfer(object):
             execute_str = "SELECT a.`" + '`,a.`'.join(keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
                 "`,c.traffic_flow as transfer_enable,c.traffic_flow_used_up as u,c.traffic_flow_used_dl as d,c.id as productid FROM user a,user_method b,user_product_traffic c WHERE a.`is_multi_user`=0 AND ( c.`expire_time`=-1 OR c.`expire_time`>unix_timestamp() ) " + \
                 "AND a.`enable`=1 AND a.`expire_in`>now() AND b.`node_id`='" + str(get_config().NODE_ID) + "' " + \
-                "AND a.`id`=b.`user_id` AND c.`status`=2 AND a.`id`=c.`user_id` AND (c.`traffic_flow`>c.`traffic_flow_used_up`+c.`traffic_flow_used_dl` OR c.`traffic_flow`=-1 OR a.`is_multi_user`=0) AND c.`node_group`=" + str(nodeinfo[0]) + \
+                "AND a.`id`=b.`user_id` AND c.`status`=2 AND a.`id`=c.`user_id` AND (c.`traffic_flow`>c.`traffic_flow_used_up`+c.`traffic_flow_used_dl` OR c.`traffic_flow`=-1) AND c.`node_group`=" + str(nodeinfo[0]) + \
                 port_mysql_str
             cur.execute(execute_str)
             # print(execute_str)
