@@ -304,7 +304,7 @@ class DbTransfer(object):
             last_transfer[id] = [last[0] + dt_transfer[id]
                                  [0], last[1] + dt_transfer[id][1]]
         self.last_update_transfer = last_transfer.copy()
-        print(dt_transfer)
+        # print(dt_transfer)
         self.update_all_user(dt_transfer)
 
     def set_detect_rule_list(self):
@@ -510,6 +510,7 @@ class DbTransfer(object):
             cur.close()
             conn.commit()
             conn.close()
+            print('nodeinfo is None:')
             return rows
 
         # print(nodeinfo)
@@ -525,6 +526,9 @@ class DbTransfer(object):
         else:
             self.is_relay = False
 
+
+        # 获取 is_multi_use=0 的用户
+        # 面板 全部用户都是 is_multi_use=0
         if get_config().PORT_GROUP == 0:
             # if nodeinfo[0] == 0:
             #     node_group_sql = ""
@@ -533,10 +537,13 @@ class DbTransfer(object):
             import port_range
             port_mysql_str = port_range.getPortRangeMysqlStr()
             cur = conn.cursor()
-            cur.execute("SELECT a." + ',a.'.join(keys) + ",c.traffic_flow as transfer_enable,c.traffic_flow_used_up as u,c.traffic_flow_used_dl as d,c.id as productid" + 
-                        " FROM user a,user_product_traffic c WHERE a.`is_multi_user`=0 AND a.`id`=c.`user_id` AND c.`status`=2 AND ( c.`expire_time`=-1 OR c.`expire_time`>unix_timestamp() OR a.`is_admin`=1 ) \
-                        AND a.`enable`=1 AND a.`expire_in`>now() AND (c.`traffic_flow`>c.`traffic_flow_used_up`+c.`traffic_flow_used_dl` OR c.`traffic_flow`=-1) AND c.`node_group`=" + str(nodeinfo[0]) + port_mysql_str
-                        )
+            execute_str = "SELECT a." + ',a.'.join(keys) + ",c.traffic_flow as transfer_enable,c.traffic_flow_used_up as u,c.traffic_flow_used_dl as d,c.id as productid" + \
+                " FROM user a,user_product_traffic c" + \
+                " WHERE a.`is_multi_user`=0 AND a.`enable`=1 AND a.`expire_in`>now()" + \
+                " AND a.`id`=c.`user_id` AND c.`status`=2 AND (c.`expire_time`=-1 OR c.`expire_time`>unix_timestamp())" + \
+                " AND (c.`traffic_flow`>c.`traffic_flow_used_up`+c.`traffic_flow_used_dl` OR c.`traffic_flow`=-1) AND c.`node_group`=" + str(nodeinfo[0]) + \
+                port_mysql_str
+            cur.execute(execute_str)
         elif get_config().PORT_GROUP == 1:
             # if nodeinfo[0] == 0:
             #     node_group_sql = ""
@@ -547,9 +554,11 @@ class DbTransfer(object):
             # print(port_mysql_str)
             cur = conn.cursor()
             execute_str = "SELECT a.`" + '`,a.`'.join(keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
-                "`,c.traffic_flow as transfer_enable,c.traffic_flow_used_up as u,c.traffic_flow_used_dl as d,c.id as productid FROM user a,user_method b,user_product_traffic c WHERE a.`is_multi_user`=0 AND ( c.`expire_time`=-1 OR c.`expire_time`>unix_timestamp() ) " + \
-                "AND a.`enable`=1 AND a.`expire_in`>now() AND b.`node_id`='" + str(get_config().NODE_ID) + "' " + \
-                "AND a.`id`=b.`user_id` AND c.`status`=2 AND a.`id`=c.`user_id` AND (c.`traffic_flow`>c.`traffic_flow_used_up`+c.`traffic_flow_used_dl` OR c.`traffic_flow`=-1) AND c.`node_group`=" + str(nodeinfo[0]) + \
+                "`,c.traffic_flow as transfer_enable,c.traffic_flow_used_up as u,c.traffic_flow_used_dl as d,c.id as productid" + \
+                " FROM user a,user_method b,user_product_traffic c" + \
+                " WHERE a.`is_multi_user`=0 AND a.`enable`=1 AND a.`expire_in`>now() " + \
+                "AND a.`id`=b.`user_id` AND b.`node_id`='" + str(get_config().NODE_ID) + "' " + \
+                "AND a.`id`=c.`user_id` AND c.`status`=2 AND (c.`expire_time`=-1 OR c.`expire_time`>unix_timestamp()) AND (c.`traffic_flow`>c.`traffic_flow_used_up`+c.`traffic_flow_used_dl` OR c.`traffic_flow`=-1) AND c.`node_group`=" + str(nodeinfo[0]) + \
                 port_mysql_str
             cur.execute(execute_str)
             # print(execute_str)
@@ -571,24 +580,48 @@ class DbTransfer(object):
         # 同样受portrange影响？
         # productid 设为 -1
 
-        if get_config().PORT_GROUP == 0:
-            pass
-        elif get_config().PORT_GROUP == 1:
-            execute_str = "SELECT a.`" + '`,a.`'.join(mu_keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
-                    "` FROM user a,user_method b WHERE " + \
-                    "a.`enable`=1 AND a.`expire_in`>now() AND b.`node_id`='" + str(get_config().NODE_ID) + "' " + \
-                    "AND a.`id`=b.`user_id` AND a.`is_multi_user`<>0 " +  \
-                    port_mysql_str
-            mu_keys += user_method_keys
+        # 获取 mu_port 的用户
+        # if get_config().PORT_GROUP == 0:
+        #     pass
+        # elif get_config().PORT_GROUP == 1:
+        # print('获取 mu_port')
+        mu_port_keys = ['port','passwd','method','protocol','protocol_param','obfs','obfs_param']
+        execute_str =   "SELECT b.`" + '`,b.`'.join(mu_port_keys) + "`,a.`port_diff`" + \
+                        " FROM mu_node a,mu_port b" + \
+                        " WHERE a.`node_id`='" + str(get_config().NODE_ID) + "' AND a.`mu_port_id`=b.`id` AND a.`enable`=1 AND b.`enable`=1"
+        cur.execute(execute_str)
+        temp = 0
+        mu_port_keys += ['port_diff']
+        for r in cur.fetchall():
+            # print(r)
+            d = {}
+            for column in range(len(mu_port_keys)):
+                d[mu_port_keys[column]] = r[column]
+            d['port'] = d['port'] + d['port_diff']
+            d['productid'] = -1
+            d['id'] = temp - 1
+            d['enable_dnsLog'] = 0
+            d['forbidden_port'] = ''
+            d['is_multi_user'] = 1
+            d['disconnect_ip'] = None
+            d['forbidden_ip'] = ''
+            # print('d',d)
+            rows.append(d)
+            # execute_str = "SELECT a.`" + '`,a.`'.join(mu_keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
+            #         "` FROM user a,user_method b" + \
+            #         " WHERE a.`enable`=1 AND a.`expire_in`>now() AND b.`node_id`='" + str(get_config().NODE_ID) + "' " + \
+            #         "AND a.`id`=b.`user_id` AND a.`is_multi_user`<>0 " +  \
+            #         port_mysql_str
+            # mu_keys += user_method_keys
             # print(execute_str)
-            cur.execute(execute_str)
-            for r in cur.fetchall():
-                d = {}
-                for column in range(len(mu_keys)):
-                    d[mu_keys[column]] = r[column]
-                d['productid'] = -1
-                # print('d',d)
-                rows.append(d)
+            # cur.execute(execute_str)
+            # for r in cur.fetchall():
+            #     d = {}
+            #     for column in range(len(mu_keys)):
+            #         d[mu_keys[column]] = r[column]
+            #     d['productid'] = -1
+            #     print('d',d)
+            #     rows.append(d)
         cur.close()
         # print(rows)
 
@@ -662,6 +695,9 @@ class DbTransfer(object):
                 self.mu_port_list.append(int(row['port']))
                 continue
 
+            # if row['id'] == 1:
+            #     print(row['id'])
+
             md5_users[row['id']] = row.copy()
             del md5_users[row['id']]['u']
             del md5_users[row['id']]['d']
@@ -676,6 +712,7 @@ class DbTransfer(object):
             md5_users[row['id']]['md5'] = common.get_md5(str(row['id']) + row['passwd'] + row['method'] + row['obfs'] + row['protocol'])
 
         # print(self.mu_port_list)
+        # print(md5_users)
 
         for row in rows:
             self.port_uid_table[row['port']] = row['id']
@@ -1054,3 +1091,4 @@ class DbTransfer(object):
         if not ServerPool.get_instance().thread.is_alive():
             return False
         return True
+
