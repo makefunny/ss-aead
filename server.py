@@ -32,7 +32,7 @@ if __name__ == '__main__':
 import server_pool
 import db_transfer
 import web_transfer
-import speedtest_thread
+# import speedtest_thread
 import nettest_thread
 import auto_thread
 import auto_block
@@ -65,8 +65,8 @@ def main():
         threadMain = MainThread(db_transfer.DbTransfer)
     threadMain.start()
 
-    threadSpeedtest = MainThread(speedtest_thread.Speedtest)
-    threadSpeedtest.start()
+    #threadSpeedtest = MainThread(speedtest_thread.Speedtest)
+    #threadSpeedtest.start()
 
     threadNettest = MainThread(nettest_thread.Nettest)
     threadNettest.start()
@@ -84,8 +84,8 @@ def main():
         import traceback
         traceback.print_exc()
         threadMain.stop()
-        if threadSpeedtest.is_alive():
-            threadSpeedtest.stop()
+        #if threadSpeedtest.is_alive():
+        #    threadSpeedtest.stop()
         if threadNettest.is_alive():
             threadNettest.stop()
         if threadAutoexec.is_alive():
