@@ -4,6 +4,9 @@ NODE_ID = nodeid
 # net upload download log and the unit is minute
 NETTEST = 0
 
+# ipv6
+ENABLE_IPV6 = 0
+
 # port group
 # 0 => default, ignore this
 # 1 => manual set

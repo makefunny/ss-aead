@@ -573,6 +573,7 @@ class DbTransfer(object):
             rows.append(d)
         cur.close()
         cur = conn.cursor()
+        # print(rows)
         # print('keys', keys)
         # print('mu_keys', mu_keys)
         # print('user_method_keys', user_method_keys)
@@ -586,23 +587,26 @@ class DbTransfer(object):
         # elif get_config().PORT_GROUP == 1:
         # print('获取 mu_port')
         mu_port_keys = ['port','passwd','method','protocol','protocol_param','obfs','obfs_param']
-        execute_str =   "SELECT b.`" + '`,b.`'.join(mu_port_keys) + "`,a.`port_diff`" + \
+        execute_str =   "SELECT b.`" + '`,b.`'.join(mu_port_keys) + "`,a.`port_diff`,a.`type`" + \
                         " FROM mu_node a,mu_port b" + \
                         " WHERE a.`node_id`='" + str(get_config().NODE_ID) + "' AND a.`mu_port_id`=b.`id` AND a.`enable`=1 AND b.`enable`=1"
         cur.execute(execute_str)
         temp = 0
-        mu_port_keys += ['port_diff']
+        mu_port_keys += ['port_diff','type']
         for r in cur.fetchall():
             # print(r)
-            d = {}
+            temp_d = {}
+            # d = {}
             for column in range(len(mu_port_keys)):
-                d[mu_port_keys[column]] = r[column]
-            d['port'] = d['port'] + d['port_diff']
+                temp_d[mu_port_keys[column]] = r[column]
+            # print(temp_d)
+            d=temp_d.copy()
+            d['port'] = temp_d['port'] + temp_d['port_diff']
             d['productid'] = -1
             d['id'] = temp - 1
             d['enable_dnsLog'] = 0
             d['forbidden_port'] = ''
-            d['is_multi_user'] = 1
+            d['is_multi_user'] = temp_d['type']
             d['disconnect_ip'] = None
             d['forbidden_ip'] = ''
             # print('d',d)
@@ -701,22 +705,23 @@ class DbTransfer(object):
             md5_users[row['id']] = row.copy()
             del md5_users[row['id']]['u']
             del md5_users[row['id']]['d']
-            if md5_users[row['id']]['disconnect_ip'] is None:
+            if md5_users[row['id']]['disconnect_ip']  is None:
                 md5_users[row['id']]['disconnect_ip'] = ''
 
-            if md5_users[row['id']]['forbidden_ip'] is None:
+            if md5_users[row['id']]['forbidden_ip']  is None:
                 md5_users[row['id']]['forbidden_ip'] = ''
 
-            if md5_users[row['id']]['forbidden_port'] is None:
+            if md5_users[row['id']]['forbidden_port']  is None:
                 md5_users[row['id']]['forbidden_port'] = ''
+            md5_users[row['id']]['token'] = row['passwd']
             md5_users[row['id']]['md5'] = common.get_md5(str(row['id']) + row['passwd'] + row['method'] + row['obfs'] + row['protocol'])
 
         # print(self.mu_port_list)
         # print(md5_users)
 
         for row in rows:
-            self.port_uid_table[row['port']] = row['id']
-            self.uid_port_table[row['id']] = row['port']
+            self.port_uid_table[row['port']]    = row['id']
+            self.uid_port_table[row['id']]      = row['port']
             self.uid_productid_table[row['id']] = row['productid']
 
         if self.mu_only == 1:
@@ -733,6 +738,7 @@ class DbTransfer(object):
         # for row in rows:
         #     if row['port']==36670:
         #         print(row)
+        # print(rows)
         for row in rows:
             port = row['port']
             user_id = row['id']
@@ -881,17 +887,13 @@ class DbTransfer(object):
 
                 if row['is_multi_user'] != 0:
                     if port in ServerPool.get_instance().tcp_servers_pool:
-                        ServerPool.get_instance().tcp_servers_pool[
-                            port].modify_multi_user_table(md5_users)
+                        ServerPool.get_instance().tcp_servers_pool[port].modify_multi_user_table(md5_users)
                     if port in ServerPool.get_instance().tcp_ipv6_servers_pool:
-                        ServerPool.get_instance().tcp_ipv6_servers_pool[
-                            port].modify_multi_user_table(md5_users)
+                        ServerPool.get_instance().tcp_ipv6_servers_pool[port].modify_multi_user_table(md5_users)
                     if port in ServerPool.get_instance().udp_servers_pool:
-                        ServerPool.get_instance().udp_servers_pool[
-                            port].modify_multi_user_table(md5_users)
+                        ServerPool.get_instance().udp_servers_pool[port].modify_multi_user_table(md5_users)
                     if port in ServerPool.get_instance().udp_ipv6_servers_pool:
-                        ServerPool.get_instance().udp_ipv6_servers_pool[
-                            port].modify_multi_user_table(md5_users)
+                        ServerPool.get_instance().udp_ipv6_servers_pool[port].modify_multi_user_table(md5_users)
 
                 if self.is_relay and row['is_multi_user'] != 2:
                     temp_relay_rules = {}
@@ -919,33 +921,25 @@ class DbTransfer(object):
                             temp_relay_rules[id] = self.relay_rule_list[id]
 
                     if port in ServerPool.get_instance().tcp_servers_pool:
-                        ServerPool.get_instance().tcp_servers_pool[
-                            port].push_relay_rules(temp_relay_rules)
+                        ServerPool.get_instance().tcp_servers_pool[port].push_relay_rules(temp_relay_rules)
                     if port in ServerPool.get_instance().tcp_ipv6_servers_pool:
-                        ServerPool.get_instance().tcp_ipv6_servers_pool[
-                            port].push_relay_rules(temp_relay_rules)
+                        ServerPool.get_instance().tcp_ipv6_servers_pool[port].push_relay_rules(temp_relay_rules)
                     if port in ServerPool.get_instance().udp_servers_pool:
-                        ServerPool.get_instance().udp_servers_pool[
-                            port].push_relay_rules(temp_relay_rules)
+                        ServerPool.get_instance().udp_servers_pool[port].push_relay_rules(temp_relay_rules)
                     if port in ServerPool.get_instance().udp_ipv6_servers_pool:
-                        ServerPool.get_instance().udp_ipv6_servers_pool[
-                            port].push_relay_rules(temp_relay_rules)
+                        ServerPool.get_instance().udp_ipv6_servers_pool[port].push_relay_rules(temp_relay_rules)
 
                 else:
                     temp_relay_rules = {}
 
                     if port in ServerPool.get_instance().tcp_servers_pool:
-                        ServerPool.get_instance().tcp_servers_pool[
-                            port].push_relay_rules(temp_relay_rules)
+                        ServerPool.get_instance().tcp_servers_pool[port].push_relay_rules(temp_relay_rules)
                     if port in ServerPool.get_instance().tcp_ipv6_servers_pool:
-                        ServerPool.get_instance().tcp_ipv6_servers_pool[
-                            port].push_relay_rules(temp_relay_rules)
+                        ServerPool.get_instance().tcp_ipv6_servers_pool[port].push_relay_rules(temp_relay_rules)
                     if port in ServerPool.get_instance().udp_servers_pool:
-                        ServerPool.get_instance().udp_servers_pool[
-                            port].push_relay_rules(temp_relay_rules)
+                        ServerPool.get_instance().udp_servers_pool[port].push_relay_rules(temp_relay_rules)
                     if port in ServerPool.get_instance().udp_ipv6_servers_pool:
-                        ServerPool.get_instance().udp_ipv6_servers_pool[
-                            port].push_relay_rules(temp_relay_rules)
+                        ServerPool.get_instance().udp_ipv6_servers_pool[port].push_relay_rules(temp_relay_rules)
 
                 if port in ServerPool.get_instance().tcp_servers_pool:
                     relay = ServerPool.get_instance().tcp_servers_pool[port]

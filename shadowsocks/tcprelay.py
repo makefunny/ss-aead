@@ -160,8 +160,10 @@ class SpeedTester(object):
 
 class TCPRelayHandler(object):
 
-    def __init__(self, server, fd_to_handlers, loop, local_sock, config,
-                 dns_resolver, is_local):
+    def __init__(
+            self, server, fd_to_handlers, loop, local_sock, config,
+            dns_resolver, is_local
+        ):
         self.logger = dnsLogger()
         self._server = server
         self._fd_to_handlers = fd_to_handlers
@@ -308,8 +310,7 @@ class TCPRelayHandler(object):
 
     def _create_encryptor(self, config):
         try:
-            self._encryptor = encrypt.Encryptor(config['password'],
-                                                config['method'])
+            self._encryptor = encrypt.Encryptor(config['password'], config['method'])
             return True
         except Exception:
             self._stage = STAGE_DESTROYED
@@ -387,22 +388,18 @@ class TCPRelayHandler(object):
                 self._udp_data_send_buffer += data
                 #logging.info('UDP over TCP sendto %d %s' % (len(data), binascii.hexlify(data)))
                 while len(self._udp_data_send_buffer) > 6:
-                    length = struct.unpack(
-                        '>H', self._udp_data_send_buffer[:2])[0]
+                    length = struct.unpack('>H', self._udp_data_send_buffer[:2])[0]
 
                     if length > len(self._udp_data_send_buffer):
                         break
 
                     data = self._udp_data_send_buffer[:length]
 
-                    self._udp_data_send_buffer = self._udp_data_send_buffer[
-                        length:]
+                    self._udp_data_send_buffer = self._udp_data_send_buffer[length:]
 
                     frag = common.ord(data[2])
                     if frag != 0:
-                        logging.warn(
-                            'drop a message since frag is %d' %
-                            (frag,))
+                        logging.warn('drop a message since frag is %d' % (frag,))
                         continue
                     else:
                         data = data[3:]
@@ -425,14 +422,11 @@ class TCPRelayHandler(object):
                 #trace = traceback.format_exc()
                 # logging.error(trace)
                 error_no = eventloop.errno_from_exception(e)
-                if error_no in (errno.EAGAIN, errno.EINPROGRESS,
-                                errno.EWOULDBLOCK):
+                if error_no in (errno.EAGAIN, errno.EINPROGRESS, errno.EWOULDBLOCK):
                     uncomplete = True
                 else:
                     shell.print_exception(e)
-                    logging.error(
-                        "exception from %s:%d" %
-                        (self._client_address[0], self._client_address[1]))
+                    logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
                     self.destroy()
                     return False
             return True
@@ -440,8 +434,7 @@ class TCPRelayHandler(object):
             try:
                 if self._encrypt_correct or self._is_relay:
                     if sock == self._remote_sock:
-                        self._server.add_transfer_u(
-                            self._current_user_id, len(data))
+                        self._server.add_transfer_u(self._current_user_id, len(data))
                 self._update_activity(len(data))
                 if data:
                     l = len(data)
@@ -453,23 +446,17 @@ class TCPRelayHandler(object):
                     return
             except (OSError, IOError) as e:
                 error_no = eventloop.errno_from_exception(e)
-                if error_no in (errno.EAGAIN, errno.EINPROGRESS,
-                                errno.EWOULDBLOCK):
+                if error_no in (errno.EAGAIN, errno.EINPROGRESS, errno.EWOULDBLOCK):
                     uncomplete = True
                 else:
                     # traceback.print_exc()
                     shell.print_exception(e)
-                    logging.error(
-                        "exception from %s:%d" %
-                        (self._client_address[0], self._client_address[1]))
+                    logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
                     self.destroy()
                     return False
             except Exception as e:
                 shell.print_exception(e)
-                logging.error(
-                    "exception from %s:%d" %
-                    (self._client_address[0],
-                     self._client_address[1]))
+                logging.error("exception from %s:%d" %(self._client_address[0],self._client_address[1]))
                 self.destroy()
                 return False
         if uncomplete:
@@ -480,18 +467,14 @@ class TCPRelayHandler(object):
                 self._data_to_write_to_remote.append(data)
                 self._update_stream(STREAM_UP, WAIT_STATUS_WRITING)
             else:
-                logging.error(
-                    'write_all_to_sock:unknown socket from %s:%d' %
-                    (self._client_address[0], self._client_address[1]))
+                logging.error('write_all_to_sock:unknown socket from %s:%d' % (self._client_address[0], self._client_address[1]))
         else:
             if sock == self._local_sock:
                 self._update_stream(STREAM_DOWN, WAIT_STATUS_READING)
             elif sock == self._remote_sock:
                 self._update_stream(STREAM_UP, WAIT_STATUS_READING)
             else:
-                logging.error(
-                    'write_all_to_sock:unknown socket from %s:%d' %
-                    (self._client_address[0], self._client_address[1]))
+                logging.error('write_all_to_sock:unknown socket from %s:%d' % (self._client_address[0], self._client_address[1]))
         return True
 
     def _handle_server_dns_resolved(self, error, remote_addr, server_addr, data):
@@ -506,15 +489,19 @@ class TCPRelayHandler(object):
                 self._remote_sock_v6.sendto(data, (server_addr, remote_addr[1]))
                 if self._udpv6_send_pack_id == 0:
                     addr, port = self._remote_sock_v6.getsockname()[:2]
-                    common.connect_log('UDPv6 sendto %s(%s):%d from %s:%d by user %d' %
-                        (common.to_str(remote_addr[0]), common.to_str(server_addr), remote_addr[1], addr, port, self._current_user_id))
+                    common.connect_log(
+                        'UDPv6 sendto %s(%s):%d from %s:%d by user %d' %
+                        (common.to_str(remote_addr[0]), common.to_str(server_addr), remote_addr[1], addr, port, self._current_user_id)
+                    )
                 self._udpv6_send_pack_id += 1
             else:
                 self._remote_sock.sendto(data, (server_addr, remote_addr[1]))
                 if self._udp_send_pack_id == 0:
                     addr, port = self._remote_sock.getsockname()[:2]
-                    common.connect_log('UDP sendto %s(%s):%d from %s:%d by user %d' %
-                        (common.to_str(remote_addr[0]), common.to_str(server_addr), remote_addr[1], addr, port, self._current_user_id))
+                    common.connect_log(
+                        'UDP sendto %s(%s):%d from %s:%d by user %d' %
+                        (common.to_str(remote_addr[0]), common.to_str(server_addr), remote_addr[1], addr, port, self._current_user_id)
+                    )
                 self._udp_send_pack_id += 1
             return True
         except Exception as e:
@@ -535,7 +522,8 @@ class TCPRelayHandler(object):
                 client_address[1],
                 0,
                 socket.SOCK_STREAM,
-                socket.SOL_TCP)
+                socket.SOL_TCP
+            )
             af, socktype, proto, canonname, sa = addrs[0]
             address_bytes = common.inet_pton(af, sa[0])
             if af == socket.AF_INET6:
@@ -585,8 +573,7 @@ class TCPRelayHandler(object):
                         except:
                             pass
 
-                if items_match[0] != "*" and common.match_regex(
-                        items_match[0], ogn_data) == False:
+                if items_match[0] != "*" and common.match_regex(items_match[0], ogn_data) == False:
                     continue
                 if len(items) > 1:
                     try:
@@ -613,8 +600,7 @@ class TCPRelayHandler(object):
         self._encrypt_correct = False
         if port is None:
             raise Exception('can not parse header')
-        data = b"\x03" + common.to_bytes(common.chr(len(host))) + \
-            common.to_bytes(host) + struct.pack('>H', port)
+        data = b"\x03" + common.to_bytes(common.chr(len(host))) + common.to_bytes(host) + struct.pack('>H', port)
         self._is_relay = True
         return data + ogn_data
 
@@ -624,8 +610,7 @@ class TCPRelayHandler(object):
             return (None, None)
 
         for id in self._relay_rules:
-            if (self._relay_rules[id]['user_id'] == 0 and self._current_user_id != 0) or self._relay_rules[
-                    id]['user_id'] == self._current_user_id:
+            if (self._relay_rules[id]['user_id'] == 0 and self._current_user_id != 0) or self._relay_rules[id]['user_id'] == self._current_user_id:
                 has_higher_priority = False
                 for priority_id in self._relay_rules:
                     if (
@@ -654,8 +639,7 @@ class TCPRelayHandler(object):
         self._encrypt_correct = False
         if port is None:
             raise Exception('can not parse header')
-        data = b"\x03" + common.to_bytes(common.chr(len(host))) + \
-            common.to_bytes(host) + struct.pack('>H', port)
+        data = b"\x03" + common.to_bytes(common.chr(len(host))) + common.to_bytes(host) + struct.pack('>H', port)
         self._is_relay = True
         return data + ogn_data
 
@@ -666,21 +650,18 @@ class TCPRelayHandler(object):
                 (binascii.hexlify(ogn_data),
                  client_address[0],
                  client_address[1],
-                 self._server._listen_port))
-        if client_address[0] not in self._server.wrong_iplist and client_address[
-                0] != 0 and self._server.is_cleaning_wrong_iplist == False:
+                 self._server._listen_port)
+            )
+        if client_address[0] not in self._server.wrong_iplist and client_address[0] != 0 and self._server.is_cleaning_wrong_iplist == False:
             self._server.wrong_iplist[client_address[0]] = time.time()
         self._encrypt_correct = False
         # create redirect or disconnect by hash code
         host, port = self._get_redirect_host(client_address, ogn_data)
         if port == 0:
             raise Exception('can not parse header')
-        data = b"\x03" + common.to_bytes(common.chr(len(host))) + \
-            common.to_bytes(host) + struct.pack('>H', port)
+        data = b"\x03" + common.to_bytes(common.chr(len(host))) + common.to_bytes(host) + struct.pack('>H', port)
         if self._config['redirect_verbose']:
-            logging.warn(
-                "TCP data redir %s:%d %s" %
-                (host, port, binascii.hexlify(data)))
+            logging.warn("TCP data redir %s:%d %s" % (host, port, binascii.hexlify(data)))
         self._is_redirect = True
         return data + ogn_data
 
@@ -691,21 +672,18 @@ class TCPRelayHandler(object):
                 (binascii.hexlify(ogn_data),
                  client_address[0],
                  client_address[1],
-                 self._server._listen_port))
-        if client_address[0] not in self._server.wrong_iplist and client_address[
-                0] != 0 and self._server.is_cleaning_wrong_iplist == False:
+                 self._server._listen_port)
+            )
+        if client_address[0] not in self._server.wrong_iplist and client_address[0] != 0 and self._server.is_cleaning_wrong_iplist == False:
             self._server.wrong_iplist[client_address[0]] = time.time()
         self._encrypt_correct = False
         # create redirect or disconnect by hash code
         host, port = self._get_redirect_host(client_address, ogn_data)
         if port == 0:
             raise Exception('can not parse header')
-        data = b"\x03" + common.to_bytes(common.chr(len(host))) + \
-            common.to_bytes(host) + struct.pack('>H', port)
+        data = b"\x03" + common.to_bytes(common.chr(len(host))) + common.to_bytes(host) + struct.pack('>H', port)
         if self._config['redirect_verbose']:
-            logging.warn(
-                "TCP data mu redir %s:%d %s" %
-                (host, port, binascii.hexlify(data)))
+            logging.warn("TCP data mu redir %s:%d %s" % (host, port, binascii.hexlify(data)))
         self._is_redirect = True
         return data + ogn_data
 
@@ -717,16 +695,14 @@ class TCPRelayHandler(object):
                 data = self._obfs.client_encode(data)
         if data:
             self._data_to_write_to_remote.append(data)
-        if self._is_local and not self._fastopen_connected and \
-                self._config['fast_open']:
+        if self._is_local and not self._fastopen_connected and self._config['fast_open']:
             # for sslocal and fastopen, we basically wait for data and use
             # sendto to connect
             try:
                 # only connect once
                 self._fastopen_connected = True
                 remote_sock = \
-                    self._create_remote_socket(self._chosen_server[0],
-                                               self._chosen_server[1])
+                    self._create_remote_socket(self._chosen_server[0], self._chosen_server[1])
                 self._loop.add(remote_sock, eventloop.POLL_ERR, self._server)
                 data = b''.join(self._data_to_write_to_remote)
                 l = len(data)
@@ -749,9 +725,7 @@ class TCPRelayHandler(object):
                     shell.print_exception(e)
                     if self._config['verbose']:
                         traceback.print_exc()
-                    logging.error(
-                        "exception from %s:%d" %
-                        (self._client_address[0], self._client_address[1]))
+                    logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
                     self.destroy()
 
     def _get_head_size(self, buf, def_value):
@@ -778,11 +752,9 @@ class TCPRelayHandler(object):
                     else:
                         header = b'\x05\x00\x00\x01'
                     addr, port = self._local_sock.getsockname()[:2]
-                    addr_to_send = socket.inet_pton(self._local_sock.family,
-                                                    addr)
+                    addr_to_send = socket.inet_pton(self._local_sock.family, addr)
                     port_to_send = struct.pack('>H', port)
-                    self._write_to_sock(header + addr_to_send + port_to_send,
-                                        self._local_sock)
+                    self._write_to_sock(header + addr_to_send + port_to_send, self._local_sock)
                     self._stage = STAGE_UDP_ASSOC
                     # just wait for the client to disconnect
                     return
@@ -807,11 +779,9 @@ class TCPRelayHandler(object):
                     is_relay = self.is_match_relay_rule_mu()
                 if self._relay_rules != {} and is_relay:
                     if self._server._config["is_multi_user"] == 0:
-                        data = self._handel_normal_relay(
-                            self._client_address, ogn_data)
+                        data = self._handel_normal_relay(self._client_address, ogn_data)
                     else:
-                        data = self._handel_mu_relay(
-                            self._client_address, ogn_data)
+                        data = self._handel_mu_relay(self._client_address, ogn_data)
                     header_result = parse_header(data)
                     if header_result is not None:
                         try:
@@ -821,18 +791,15 @@ class TCPRelayHandler(object):
                     if header_result is None:
                         is_error = True
                         if self._server._config["is_multi_user"] == 0:
-                            data = self._handel_protocol_error(
-                                self._client_address, ogn_data)
+                            data = self._handel_protocol_error(self._client_address, ogn_data)
                         else:
-                            data = self._handel_mu_protocol_error(
-                                self._client_address, ogn_data)
+                            data = self._handel_mu_protocol_error(self._client_address, ogn_data)
                         header_result = parse_header(data)
                 else:
                     data = pre_parse_header(data)
                     if data is None:
                         is_error = True
-                        data = self._handel_protocol_error(
-                            self._client_address, ogn_data)
+                        data = self._handel_protocol_error(self._client_address, ogn_data)
                     header_result = parse_header(data)
                     if header_result is not None:
                         try:
@@ -841,8 +808,7 @@ class TCPRelayHandler(object):
                             header_result = None
                     if header_result is None:
                         is_error = True
-                        data = self._handel_protocol_error(
-                            self._client_address, ogn_data)
+                        data = self._handel_protocol_error(self._client_address, ogn_data)
                         header_result = parse_header(data)
                 self._overhead = self._obfs.get_overhead(self._is_local) + self._protocol.get_overhead(self._is_local)
                 self._recv_buffer_size = BUF_SIZE - self._overhead
@@ -888,6 +854,7 @@ class TCPRelayHandler(object):
                                 if self._server.is_cleaning_detect_log == False and id not in self._server.detect_log_list:
                                     self._server.detect_log_list.append(id)
                             self._handle_detect_rule_match(remote_port)
+
                             raise Exception(
                                 '[all_detect] This connection match the regex: id:%d was reject,regex: %s ,%s connecting %s:%d from %s:%d via port %d' %
                                 (
@@ -909,6 +876,7 @@ class TCPRelayHandler(object):
                                 if self._server.is_cleaning_detect_log == False and id not in self._server.detect_log_list:
                                     self._server.detect_log_list.append(id)
                             self._handle_detect_rule_match(remote_port)
+
                             raise Exception(
                                 'This connection match the regex: id:%d was reject,regex: %s ,connecting %s:%d from %s:%d via port %d' %
                                 (
@@ -922,12 +890,10 @@ class TCPRelayHandler(object):
                     self._server.connected_iplist.append(common.getRealIp(self._client_address[0]))
 
                 if self._config['is_multi_user'] != 0 and self._current_user_id != 0:
-                    if common.getRealIp(self._client_address[0]) not in self._server.mu_connected_iplist[
-                            self._current_user_id] and self._client_address[0] != 0:
+                    if common.getRealIp(self._client_address[0]) not in self._server.mu_connected_iplist[self._current_user_id] and self._client_address[0] != 0:
                         self._server.mu_connected_iplist[self._current_user_id].append(common.getRealIp(self._client_address[0]))
 
-                if self._client_address[0] in self._server.wrong_iplist and self._client_address[
-                        0] != 0 and self._server.is_cleaning_wrong_iplist == False:
+                if self._client_address[0] in self._server.wrong_iplist and self._client_address[0] != 0 and self._server.is_cleaning_wrong_iplist == False:
                     del self._server.wrong_iplist[self._client_address[0]]
 
             self._remote_address = (common.to_str(remote_addr), remote_port)
@@ -938,8 +904,7 @@ class TCPRelayHandler(object):
             if self._is_local:
                 # forward address to remote
                 self._write_to_sock((b'\x05\x00\x00\x01'
-                                     b'\x00\x00\x00\x00\x10\x10'),
-                                    self._local_sock)
+                                     b'\x00\x00\x00\x00\x10\x10'), self._local_sock)
                 head_len = self._get_head_size(data, 30)
                 self._obfs.obfs.server_info.head_len = head_len
                 self._protocol.obfs.server_info.head_len = head_len
@@ -950,15 +915,13 @@ class TCPRelayHandler(object):
                 if data_to_send:
                     self._data_to_write_to_remote.append(data_to_send)
                 # notice here may go into _handle_dns_resolved directly
-                self._dns_resolver.resolve(self._chosen_server[0],
-                                           self._handle_dns_resolved)
+                self._dns_resolver.resolve(self._chosen_server[0], self._handle_dns_resolved)
             else:
                 if len(data) > header_length:
                     if self._header_buf != []:
                         is_relay = self.is_match_relay_rule_mu()
                         if is_relay:
-                            self._write_to_sock(
-                                self._header_buf, self._remote_sock)
+                            self._write_to_sock(self._header_buf, self._remote_sock)
                             self._header_buf = []
                     self._data_to_write_to_remote.append(data[header_length:])
                 # notice here may go into _handle_dns_resolved directly
@@ -978,6 +941,7 @@ class TCPRelayHandler(object):
                                         self.logger.detected( 'user_id: %d, DNS: %s, server_port: %d, client ip: %s' % (self._config['user_id'], common.to_str(remote_addr), self._server._listen_port, common.getRealIp(self._client_address[0]))  )
                                     except Exception as e:
                                         logging.error('DNS log error: %s', str(e))
+
                                 raise Exception(
                                     '[dns_detect] This connection match the regex: id:%d was reject,regex: %s ,%s connecting %s:%d from %s:%d via port %d' %
                                     (
@@ -1043,107 +1007,104 @@ class TCPRelayHandler(object):
             bind_addr = None
 
         if bind_addr:
-            local_addrs = socket.getaddrinfo(
-                bind_addr, 0, 0, socket.SOCK_STREAM, socket.SOL_TCP)
+            local_addrs = socket.getaddrinfo(bind_addr, 0, 0, socket.SOCK_STREAM, socket.SOL_TCP)
             if local_addrs[0][0] == af:
                 logging.debug("bind %s" % (bind_addr,))
                 sock.bind((bind_addr, 0))
 
     def _create_remote_socket(self, ip, port):
         if self._remote_udp:
-            addrs_v6 = socket.getaddrinfo(
-                "::", 0, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
-            addrs = socket.getaddrinfo(
-                "0.0.0.0", 0, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
+            addrs_v6 = socket.getaddrinfo("::", 0, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
+            addrs = socket.getaddrinfo("0.0.0.0", 0, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
         else:
-            addrs = socket.getaddrinfo(
-                ip, port, 0, socket.SOCK_STREAM, socket.SOL_TCP)
+            addrs = socket.getaddrinfo(ip, port, 0, socket.SOCK_STREAM, socket.SOL_TCP)
         if len(addrs) == 0:
             raise Exception("getaddrinfo failed for %s:%d" % (ip, port))
         af, socktype, proto, canonname, sa = addrs[0]
 
         if not self._remote_udp and self._is_redirect == False:
-            if self._server._config[
-                    "is_multi_user"] != 0 and self._current_user_id != 0:
-                if self._server.multi_user_table[
-                        self._current_user_id]['_forbidden_iplist']:
-                    if common.to_str(sa[0]) in self._server.multi_user_table[
-                            self._current_user_id]['_forbidden_iplist']:
+            if self._server._config["is_multi_user"] != 0 and self._current_user_id != 0:
+                if self._server.multi_user_table[self._current_user_id]['_forbidden_iplist']:
+                    if common.to_str(sa[0]) in self._server.multi_user_table[self._current_user_id]['_forbidden_iplist']:
                         if self._remote_address:
                             raise Exception(
                                 'IP %s is in forbidden list, when connect to %s:%d via port %d' %
-                                (common.to_str(
+                                (
+                                    common.to_str(
                                     sa[0]),
                                     self._remote_address[0],
                                     self._remote_address[1],
                                     self._server.multi_user_table[
-                                    self._current_user_id]['port']))
-                        raise Exception('IP %s is in forbidden list, reject' %
-                                        common.to_str(sa[0]))
-                if self._server.multi_user_table[
-                        self._current_user_id]['_forbidden_portset']:
-                    if sa[1] in self._server.multi_user_table[
-                            self._current_user_id]['_forbidden_portset']:
+                                    self._current_user_id]['port']
+                                )
+                            )
+                        raise Exception('IP %s is in forbidden list, reject' % common.to_str(sa[0]))
+                if self._server.multi_user_table[self._current_user_id]['_forbidden_portset']:
+                    if sa[1] in self._server.multi_user_table[self._current_user_id]['_forbidden_portset']:
                         if self._remote_address:
                             raise Exception(
                                 'Port %d is in forbidden list, when connect to %s:%d via port %d' %
-                                (sa[1],
-                                 self._remote_address[0],
+                                (
+                                    sa[1],
+                                    self._remote_address[0],
                                     self._remote_address[1],
-                                    self._server.multi_user_table[
-                                    self._current_user_id]['port']))
-                        raise Exception(
-                            'Port %d is in forbidden list, reject' %
-                            sa[1])
-                if self._server.multi_user_table[
-                        self._current_user_id]['_disconnect_ipset']:
-                    if self._client_address[0] in self._server.multi_user_table[
-                            self._current_user_id]['_disconnect_ipset']:
+                                    self._server.multi_user_table[self._current_user_id]['port']
+                                )
+                            )
+                        raise Exception('Port %d is in forbidden list, reject' % sa[1])
+                if self._server.multi_user_table[self._current_user_id]['_disconnect_ipset']:
+                    if self._client_address[0] in self._server.multi_user_table[self._current_user_id]['_disconnect_ipset']:
                         if self._remote_address:
                             raise Exception(
                                 'IP %s is in disconnect list, when connect to %s:%d via port %d' %
-                                (self._client_address[0],
+                                (
+                                    self._client_address[0],
                                     self._remote_address[0],
                                     self._remote_address[1],
-                                    self._server.multi_user_table[
-                                    self._current_user_id]['port']))
-                        raise Exception('IP %s is in disconnect list, reject' %
-                                        (self._client_address[0]))
+                                    self._server.multi_user_table[self._current_user_id]['port']
+                                )
+                            )
+                        raise Exception('IP %s is in disconnect list, reject' % (self._client_address[0]))
             else:
                 if self._server._forbidden_iplist:
                     if common.to_str(sa[0]) in self._server._forbidden_iplist:
                         if self._remote_address:
                             raise Exception(
                                 'IP %s is in forbidden list, when connect to %s:%d via port %d' %
-                                (self._client_address[0],
+                                (
+                                    self._client_address[0],
                                     self._remote_address[0],
                                     self._remote_address[1],
-                                    self._server._listen_port))
-                        raise Exception('IP %s is in forbidden list, reject' %
-                                        common.to_str(sa[0]))
+                                    self._server._listen_port
+                                )
+                            )
+                        raise Exception('IP %s is in forbidden list, reject' % common.to_str(sa[0]))
                 if self._server._forbidden_portset:
                     if sa[1] in self._server._forbidden_portset:
                         if self._remote_address:
                             raise Exception(
                                 'Port %d is in forbidden list, when connect to %s:%d via port %d' %
-                                (sa[1],
-                                 self._remote_address[0],
+                                (
+                                    sa[1],
+                                    self._remote_address[0],
                                     self._remote_address[1],
-                                    self._server._listen_port))
-                        raise Exception(
-                            'Port %d is in forbidden list, reject' %
-                            sa[1])
+                                    self._server._listen_port
+                                )
+                            )
+                        raise Exception('Port %d is in forbidden list, reject' % sa[1])
                 if self._server._disconnect_ipset:
                     if self._client_address[0] in self._server._disconnect_ipset:
                         if self._remote_address:
                             raise Exception(
                                 'IP %s is in disconnect list, when connect to %s:%d via port %d' %
-                                (self._client_address[0],
+                                (
+                                    self._client_address[0],
                                     self._remote_address[0],
                                     self._remote_address[1],
-                                    self._server._listen_port))
-                        raise Exception('IP %s is in disconnect list, reject' %
-                                        self._client_address[0])
+                                    self._server._listen_port
+                                )
+                            )
+                        raise Exception('IP %s is in disconnect list, reject' % self._client_address[0])
         remote_sock = socket.socket(af, socktype, proto)
         self._remote_sock = remote_sock
         self._remote_sock_fd = remote_sock.fileno()
@@ -1196,34 +1157,27 @@ class TCPRelayHandler(object):
                         # TODO when there is already data in this packet
                     else:
                         # else do connect
-                        remote_sock = self._create_remote_socket(remote_addr,
-                                                                 remote_port)
+                        remote_sock = self._create_remote_socket(remote_addr, remote_port)
                         if self._remote_udp:
-                            self._loop.add(remote_sock,
-                                           eventloop.POLL_IN,
-                                           self._server)
+                            self._loop.add(remote_sock, eventloop.POLL_IN, self._server)
                             if self._remote_sock_v6:
-                                self._loop.add(self._remote_sock_v6,
-                                               eventloop.POLL_IN,
-                                               self._server)
+                                self._loop.add(self._remote_sock_v6, eventloop.POLL_IN, self._server)
                         else:
                             try:
-                                remote_sock.connect(
-                                    (remote_addr, remote_port))
+                                remote_sock.connect((remote_addr, remote_port))
                             except (OSError, IOError) as e:
-                                if eventloop.errno_from_exception(e) in (
-                                        errno.EINPROGRESS, errno.EWOULDBLOCK):
+                                if eventloop.errno_from_exception(e) in (errno.EINPROGRESS, errno.EWOULDBLOCK):
                                     pass  # always goto here
                                 else:
                                     raise e
 
                             addr, port = self._remote_sock.getsockname()[:2]
-                            common.connect_log('TCP connecting %s(%s):%d from %s:%d by user %d' %
-                                (common.to_str(self._remote_address[0]), common.to_str(remote_addr), remote_port, addr, port, self._current_user_id))
+                            common.connect_log(
+                                'TCP connecting %s(%s):%d from %s:%d by user %d' %
+                                (common.to_str(self._remote_address[0]), common.to_str(remote_addr), remote_port, addr, port, self._current_user_id)
+                            )
 
-                            self._loop.add(remote_sock,
-                                       eventloop.POLL_ERR | eventloop.POLL_OUT,
-                                       self._server)
+                            self._loop.add(remote_sock, eventloop.POLL_ERR | eventloop.POLL_OUT, self._server)
                         self._stage = STAGE_CONNECTING
                         self._update_stream(STREAM_UP, WAIT_STATUS_READWRITING)
                         self._update_stream(STREAM_DOWN, WAIT_STATUS_READING)
@@ -1237,9 +1191,7 @@ class TCPRelayHandler(object):
                     shell.print_exception(e)
                     if self._config['verbose']:
                         traceback.print_exc()
-                    logging.error(
-                        "exception from %s:%d" %
-                        (self._client_address[0], self._client_address[1]))
+                    logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
         self.destroy()
 
     def is_match_relay_rule_mu(self):
@@ -1288,20 +1240,18 @@ class TCPRelayHandler(object):
             is_Failed = False
             data = None
             try:
+                # 获取远程origin数据
                 data = self._local_sock.recv(recv_buffer_size)
             except (OSError, IOError) as e:
-                if eventloop.errno_from_exception(e) in \
-                        (errno.ETIMEDOUT, errno.EAGAIN, errno.EWOULDBLOCK):
+                if eventloop.errno_from_exception(e) in (errno.ETIMEDOUT, errno.EAGAIN, errno.EWOULDBLOCK):
                     return
             if not data:
                 self.destroy()
                 return
 
             self._server.speed_tester_u.add(len(data))
-            if self._current_user_id != 0 and self._server._config[
-                    "is_multi_user"] != 0:
-                self._server.mu_speed_tester_u[
-                    self._current_user_id].add(len(data))
+            if self._current_user_id != 0 and self._server._config["is_multi_user"] != 0:
+                self._server.mu_speed_tester_u[self._current_user_id].add(len(data))
 
             ogn_data = data
 
@@ -1309,133 +1259,155 @@ class TCPRelayHandler(object):
             if not is_local and (
                 (self._server._config["is_multi_user"] == 0 and self._relay_rules == {}) or (
                     self._server._config["is_multi_user"] != 0 and (
-                        (self._current_user_id == 0 or is_relay == False) or self._relay_rules == {}))):
+                        (self._current_user_id == 0 or is_relay == False) or self._relay_rules == {}
+                    )
+                )
+            ):
                 if self._encryptor is not None:
                     if self._encrypt_correct:
+                        # logging.info('%d raw-data %d %s' % (self._current_user_id,len(data),data))
                         host = ''
                         try:
                             obfs_decode = self._obfs.server_decode(data)
+                            # print(self._server._config['obfs'], data, obfs_decode)
                             if self._stage == STAGE_INIT:
                                 self._overhead = self._obfs.get_overhead(self._is_local) + self._protocol.get_overhead(self._is_local)
                                 server_info = self._protocol.get_server_info()
                                 server_info.overhead = self._overhead
                         except Exception as e:
                             shell.print_exception(e)
-                            logging.error(
-                                "exception from %s:%d" %
-                                (self._client_address[0], self._client_address[1]))
+                            logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
                             self.destroy()
                             return
                         need_sendback = False
                         if obfs_decode[2]:
                             host_name = ''
-                            if self._server._config[
-                                    "is_multi_user"] == 1 and self._current_user_id == 0:
-                                if self._server._config[
-                                        "obfs"] == b"tls1.2_ticket_auth" or self._server._config[
-                                                "obfs"] == b"tls1.2_ticket_fastauth":
+                            if self._server._config["is_multi_user"] == 1 and self._current_user_id == 0:
+                                if self._server._config["obfs"] == b"tls1.2_ticket_auth" or self._server._config["obfs"] == b"tls1.2_ticket_fastauth":
                                     if(len(obfs_decode) > 3):
                                         host = obfs_decode[3] + ":" + str(self._server._listen_port)
                             need_sendback = True
                         if obfs_decode[1]:
-                            if self._server._config[
-                                    "is_multi_user"] == 1 and self._current_user_id == 0:
+                            if self._server._config["is_multi_user"] == 1 and self._current_user_id == 0:
                                 if self._server._config["obfs"] in [b"http_simple", b"http_post", b"simple_obfs_tls", b"simple_obfs_http"]:
                                     if(len(obfs_decode) > 3):
                                         host = obfs_decode[3]
                             if not self._protocol.obfs.server_info.recv_iv:
-                                iv_len = len(
-                                    self._protocol.obfs.server_info.iv)
-                                self._protocol.obfs.server_info.recv_iv = obfs_decode[
-                                    0][:iv_len]
+                                iv_len = len(self._protocol.obfs.server_info.iv)
+                                self._protocol.obfs.server_info.recv_iv = obfs_decode[0][:iv_len]
                             try:
+                                # 解密
                                 data = self._encryptor.decrypt(obfs_decode[0])
                             except Exception as e:
-                                logging.error(
-                                    "decrypt data failed, exception from %s:%d" %
-                                    (self._client_address[0], self._client_address[1]))
+                                logging.error("decrypt data failed, exception from %s:%d" % (self._client_address[0], self._client_address[1]))
                                 data = [0]
                         else:
                             data = obfs_decode[0]
 
-                        if self._server._config[
-                                "is_multi_user"] == 1 and self._current_user_id == 0:
-                            try:
-                                host_list = host.split(":", 2)
-                                host_name = host_list[0]
-                                if host_name in self._server.multi_user_host_table:
-                                    self._update_user(
-                                        self._server.multi_user_host_table[host_name])
-                                else:
+                        if self._server._config["protocol"] == b"auth_simple":
+                            # uid = 
+                            pass
+
+                        # 混淆式 单端口多用户
+                        # print(self._current_user_id,len(data),data)
+                        if self._server._config["is_multi_user"] == 1 and self._current_user_id == 0:
+                            # logging.info("host")
+                            if host:
+                                try:
+                                    host_list = host.split(":", 2)
+                                    host_name = host_list[0]
+                                    # print(self._server.multi_user_host_table)
+                                    if host_name in self._server.multi_user_host_table:
+                                        # 根据 host_name 确定用户
+                                        self._update_user(self._server.multi_user_host_table[host_name])
+                                    else:
+                                        logging.error(
+                                            'The host:%s md5 is mismatch,so The connection has been rejected, when connect from %s:%d via port %d' %
+                                            (host_name, self._client_address[0], self._client_address[1], self._server._listen_port)
+                                        )
+                                        is_Failed = True
+                                except Exception as e:
+                                    # logging.error(e)
                                     logging.error(
-                                        'The host:%s md5 is mismatch,so The connection has been rejected, when connect from %s:%d via port %d' %
-                                        (host_name, self._client_address[0], self._client_address[1], self._server._listen_port))
+                                        'The mu hostname is error,so The connection has been rejected, when connect from %s:%d via port %d' %
+                                        (self._client_address[0], self._client_address[1], self._server._listen_port)
+                                    )
                                     is_Failed = True
-                            except Exception as e:
-                                logging.error(
-                                    'The mu hostname is error,so The connection has been rejected, when connect from %s:%d via port %d' %
-                                    (self._client_address[0], self._client_address[1], self._server._listen_port))
+                            else:
+                                logging.error('host is None')
                                 is_Failed = True
 
                         try:
-                            data, sendback = self._protocol.server_post_decrypt(
-                                data)
-
-                            if self._server._config[
-                                    "is_multi_user"] == 2 and self._current_user_id == 0 and data:
+                            if self._server._config["protocol"] == b"auth_simple" and self._server._config["is_multi_user"] == 3:
+                                data, sendback, token = self._protocol.server_post_decrypt(data)
+                                token = token.decode('utf8')
+                                try:
+                                    # print(token, self._server.multi_user_token_table)
+                                    # logging.info('%s %s' % (token, data))
+                                    if token in self._server.multi_user_token_table:
+                                        # 根据 host_name 确定用户
+                                        self._update_user(self._server.multi_user_token_table[token])
+                                    else:
+                                        logging.error(
+                                            'The host:%s md5 is mismatch,so The connection has been rejected, when connect from %s:%d via port %d' %
+                                            (host_name, self._client_address[0], self._client_address[1], self._server._listen_port))
+                                        is_Failed = True
+                                        raise Exception('Error token %s %s' % (data, token))
+                                except Exception as e:
+                                    is_Failed = True
+                                    raise Exception('Error get token %s %s' % (data, token))
+                            elif self._server._config["protocol"] == b"auth_simple":
+                                is_Failed = True
+                                raise Exception('auth_simple is used for multi-user(type 3) only, the type is:%d'%self._server._config["is_multi_user"])
+                            else:
+                                data, sendback  = self._protocol.server_post_decrypt(data)
+                            # logging.info('%d %d %s' % (self._current_user_id, self._stage, data))
+                            # 协议式 单端口多用户
+                            if self._server._config["is_multi_user"] == 2 and self._current_user_id == 0 and data:
                                 logging.error(
-                                    'The port is multi user in single port only , but the key remote provided is error or empty, so The connection has been rejected, when connect from %s:%d via port %d' %
+                                    'The port is multi-user only , but the key remote provided is error or empty, so The connection has been rejected, when connect from %s:%d via port %d' %
                                     (self._client_address[0], self._client_address[1], self._server._listen_port))
                                 is_Failed = True
 
-                            if self._server._config[
-                                    "is_multi_user"] == 2 and self._current_user_id == 0 and ogn_data:
+                            if self._server._config["is_multi_user"] == 2 and self._current_user_id == 0 and ogn_data:
                                 self._header_buf = ogn_data[:]
 
                             is_relay = self.is_match_relay_rule_mu()
 
                             if not is_relay and need_sendback:
                                 data_sendback = self._obfs.server_encode(b'')
+                                # print('data_sendback', data_sendback)
                                 try:
-                                    self._write_to_sock(
-                                        data_sendback, self._local_sock)
+                                    self._write_to_sock(data_sendback, self._local_sock)
                                 except Exception as e:
                                     shell.print_exception(e)
                                     if self._config['verbose']:
                                         traceback.print_exc()
-                                    logging.error(
-                                        "exception from %s:%d" %
-                                        (self._client_address[0], self._client_address[1]))
+                                    logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
                                     self.destroy()
                                     return
 
                             if sendback and not is_relay:
-                                backdata = self._protocol.server_pre_encrypt(
-                                    b'')
+                                backdata = self._protocol.server_pre_encrypt(b'')
                                 backdata = self._encryptor.encrypt(backdata)
                                 backdata = self._obfs.server_encode(backdata)
+                                # print('backdata',backdata)
                                 try:
-                                    self._write_to_sock(
-                                        backdata, self._local_sock)
+                                    self._write_to_sock(backdata, self._local_sock)
                                 except Exception as e:
                                     shell.print_exception(e)
                                     if self._config['verbose']:
                                         traceback.print_exc()
-                                    logging.error(
-                                        "exception from %s:%d" %
-                                        (self._client_address[0], self._client_address[1]))
+                                    logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
                                     self.destroy()
                                     return
                         except Exception as e:
                             shell.print_exception(e)
-                            logging.error(
-                                "exception from %s:%d" %
-                                (self._client_address[0], self._client_address[1]))
+                            logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
                             self.destroy()
 
                         if is_Failed:
-                            data = self._handel_mu_protocol_error(
-                                self._client_address, ogn_data)
+                            data = self._handel_mu_protocol_error(self._client_address, ogn_data)
 
                         if is_relay:
                             data = ogn_data
@@ -1448,6 +1420,7 @@ class TCPRelayHandler(object):
             if self._config['verbose']:
                 traceback.print_exc()
             self.destroy()
+        # print(self._stage)
         if self._stage == STAGE_STREAM:
             if self._is_local:
                 if self._encryptor is not None:
@@ -1461,8 +1434,8 @@ class TCPRelayHandler(object):
             self._stage = STAGE_ADDR
         elif self._stage == STAGE_CONNECTING:
             self._handle_stage_connecting(data)
-        elif (is_local and self._stage == STAGE_ADDR) or \
-                (not is_local and self._stage == STAGE_INIT):
+        elif (is_local and self._stage == STAGE_ADDR) or (not is_local and self._stage == STAGE_INIT):
+            # print(ogn_data,data)
             self._handle_stage_addr(ogn_data, data)
 
     def _on_remote_read(self, is_remote_sock):
@@ -1481,8 +1454,7 @@ class TCPRelayHandler(object):
                 if is_remote_sock:
                     data, addr = self._remote_sock.recvfrom(UDP_MAX_BUF_SIZE)
                 else:
-                    data, addr = self._remote_sock_v6.recvfrom(
-                        UDP_MAX_BUF_SIZE)
+                    data, addr = self._remote_sock_v6.recvfrom(UDP_MAX_BUF_SIZE)
                 port = struct.pack('>H', addr[1])
                 try:
                     ip = socket.inet_aton(addr[0])
@@ -1502,21 +1474,20 @@ class TCPRelayHandler(object):
                 data = self._remote_sock.recv(recv_buffer_size)
                 self._recv_pack_id += 1
         except (OSError, IOError) as e:
-            if eventloop.errno_from_exception(e) in (
+            if  eventloop.errno_from_exception(e) in (
                     errno.ETIMEDOUT,
                     errno.EAGAIN,
                     errno.EWOULDBLOCK,
-                    10035):  # errno.WSAEWOULDBLOCK
+                    10035
+            ):  # errno.WSAEWOULDBLOCK
                 return
         if not data:
             self.destroy()
             return
 
         self._server.speed_tester_d.add(len(data))
-        if self._current_user_id != 0 and self._server._config[
-                "is_multi_user"] != 0:
-            self._server.mu_speed_tester_d[
-                self._current_user_id].add(len(data))
+        if self._current_user_id != 0 and self._server._config["is_multi_user"] != 0:
+            self._server.mu_speed_tester_d[self._current_user_id].add(len(data))
 
         if self._encryptor is not None:
             if self._is_local:
@@ -1524,9 +1495,7 @@ class TCPRelayHandler(object):
                     obfs_decode = self._obfs.client_decode(data)
                 except Exception as e:
                     shell.print_exception(e)
-                    logging.error(
-                        "exception from %s:%d" %
-                        (self._client_address[0], self._client_address[1]))
+                    logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
                     self.destroy()
                     return
                 if obfs_decode[1]:
@@ -1534,14 +1503,11 @@ class TCPRelayHandler(object):
                     self._write_to_sock(send_back, self._remote_sock)
                 if not self._protocol.obfs.server_info.recv_iv:
                     iv_len = len(self._protocol.obfs.server_info.iv)
-                    self._protocol.obfs.server_info.recv_iv = obfs_decode[
-                        0][:iv_len]
+                    self._protocol.obfs.server_info.recv_iv = obfs_decode[0][:iv_len]
                 try:
                     data = self._encryptor.decrypt(obfs_decode[0])
                 except Exception as e:
-                    logging.error(
-                        "decrypt data failed, exception from %s:%d" %
-                        (self._client_address[0], self._client_address[1]))
+                    logging.error("decrypt data failed, exception from %s:%d" % (self._client_address[0], self._client_address[1]))
                     self.destroy()
                     return
                 try:
@@ -1550,9 +1516,7 @@ class TCPRelayHandler(object):
                         self._tcp_mss = self._protocol.get_server_info().tcp_mss
                 except Exception as e:
                     shell.print_exception(e)
-                    logging.error(
-                        "exception from %s:%d" %
-                        (self._client_address[0], self._client_address[1]))
+                    logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
                     self.destroy()
                     return
             else:
@@ -1571,10 +1535,7 @@ class TCPRelayHandler(object):
             shell.print_exception(e)
             if self._config['verbose']:
                 traceback.print_exc()
-            logging.error(
-                "exception from %s:%d" %
-                (self._client_address[0],
-                 self._client_address[1]))
+            logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
             self.destroy()
 
     def _on_local_write(self):
@@ -1601,10 +1562,7 @@ class TCPRelayHandler(object):
         logging.debug('got local error')
         if self._local_sock:
             logging.error(eventloop.get_sock_error(self._local_sock))
-            logging.error(
-                "exception from %s:%d" %
-                (self._client_address[0],
-                 self._client_address[1]))
+            logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
         self.destroy()
 
     def _on_remote_error(self):
@@ -1618,12 +1576,10 @@ class TCPRelayHandler(object):
                      self._remote_address[1],
                      self._client_address[0],
                      self._client_address[1],
-                     self._server._listen_port))
+                     self._server._listen_port)
+                )
             else:
-                logging.error(
-                    "exception from %s:%d" %
-                    (self._client_address[0],
-                     self._client_address[1]))
+                logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
         self.destroy()
 
     def handle_event(self, sock, fd, event):
@@ -1640,10 +1596,8 @@ class TCPRelayHandler(object):
                 is_exceed = False
                 if self._server.speed_tester_d.isExceed():
                     is_exceed = True
-                if self._current_user_id != 0 and self._server._config[
-                        "is_multi_user"] != 0:
-                    if self._server.mu_speed_tester_d[
-                            self._current_user_id].isExceed():
+                if self._current_user_id != 0 and self._server._config["is_multi_user"] != 0:
+                    if self._server.mu_speed_tester_d[self._current_user_id].isExceed():
                         is_exceed = True
                 if not is_exceed:
                     handle = True
@@ -1663,10 +1617,8 @@ class TCPRelayHandler(object):
                 is_exceed = False
                 if self._server.speed_tester_u.isExceed():
                     is_exceed = True
-                if self._current_user_id != 0 and self._server._config[
-                        "is_multi_user"] != 0:
-                    if self._server.mu_speed_tester_u[
-                            self._current_user_id].isExceed():
+                if self._current_user_id != 0 and self._server._config["is_multi_user"] != 0:
+                    if self._server.mu_speed_tester_u[self._current_user_id].isExceed():
                         is_exceed = True
                 if not is_exceed:
                     handle = True
@@ -1677,8 +1629,7 @@ class TCPRelayHandler(object):
                 handle = True
                 self._on_local_write()
         else:
-            logging.warn('unknown socket from %s:%d' %
-                         (self._client_address[0], self._client_address[1]))
+            logging.warn('unknown socket from %s:%d' % (self._client_address[0], self._client_address[1]))
             try:
                 self._loop.removefd(fd)
             except Exception as e:
@@ -1692,8 +1643,7 @@ class TCPRelayHandler(object):
         return handle
 
     def _log_error(self, e):
-        logging.error('%s when handling connection from %s:%d' %
-                      (e, self._client_address[0], self._client_address[1]))
+        logging.error('%s when handling connection from %s:%d' % (e, self._client_address[0], self._client_address[1]))
 
     def stage(self):
         return self._stage
@@ -1712,8 +1662,7 @@ class TCPRelayHandler(object):
             return
         self._stage = STAGE_DESTROYED
         if self._remote_address:
-            logging.debug('destroy: %s:%d' %
-                          self._remote_address)
+            logging.debug('destroy: %s:%d' % self._remote_address)
         else:
             logging.debug('destroy')
         if self._remote_sock:
@@ -1777,7 +1726,8 @@ class TCPRelay(object):
             dns_resolver,
             is_local,
             stat_callback=None,
-            stat_counter=None):
+            stat_counter=None
+        ):
         self._config = config
         self._is_local = is_local
         self._dns_resolver = dns_resolver
@@ -1805,17 +1755,17 @@ class TCPRelay(object):
         self.is_pushing_relay_rules = False
         if 'users_table' in self._config:
             self.multi_user_host_table = {}
+            self.multi_user_token_table = {}
             self.multi_user_table = self._config['users_table']
-
+            # print(self._config['users_table'])
             for id in self.multi_user_table:
-                self.multi_user_host_table[common.get_mu_host(
-                    id, self.multi_user_table[id]['md5'])] = id
+                self.multi_user_token_table[self.multi_user_table[id]['token']] = id
+                self.multi_user_host_table[common.get_mu_host(id, self.multi_user_table[id]['md5'])] = id
 
                 if 'node_speedlimit' not in self.multi_user_table[id]:
                     bandwidth = 0
                 else:
-                    bandwidth = float(
-                        self.multi_user_table[id]['node_speedlimit']) * 128
+                    bandwidth = float(self.multi_user_table[id]['node_speedlimit']) * 128
 
                 self.mu_speed_tester_u[id] = SpeedTester(bandwidth)
                 self.mu_speed_tester_d[id] = SpeedTester(bandwidth)
@@ -1852,24 +1802,19 @@ class TCPRelay(object):
                 self.mu_reset_time[id] = time.time()
 
                 if self.multi_user_table[id]['forbidden_ip'] is not None:
-                    self.multi_user_table[id]['_forbidden_iplist'] = IPNetwork(
-                        str(self.multi_user_table[id]['forbidden_ip']))
+                    self.multi_user_table[id]['_forbidden_iplist'] = IPNetwork(str(self.multi_user_table[id]['forbidden_ip']))
                 else:
-                    self.multi_user_table[id][
-                        '_forbidden_iplist'] = IPNetwork(str(""))
+                    self.multi_user_table[id]['_forbidden_iplist'] = IPNetwork(str(""))
 
                 if self.multi_user_table[id]['disconnect_ip'] is not None:
-                    self.multi_user_table[id]['_disconnect_ipset'] = IPNetwork(
-                        str(self.multi_user_table[id]['disconnect_ip']))
+                    self.multi_user_table[id]['_disconnect_ipset'] = IPNetwork(str(self.multi_user_table[id]['disconnect_ip']))
                 else:
                     self.multi_user_table[id]['_disconnect_ipset'] = None
 
                 if self.multi_user_table[id]['forbidden_port'] is not None:
-                    self.multi_user_table[id]['_forbidden_portset'] = PortRange(
-                        str(self.multi_user_table[id]['forbidden_port']))
+                    self.multi_user_table[id]['_forbidden_portset'] = PortRange(str(self.multi_user_table[id]['forbidden_port']))
                 else:
-                    self.multi_user_table[id][
-                        '_forbidden_portset'] = PortRange(str(""))
+                    self.multi_user_table[id]['_forbidden_portset'] = PortRange(str(""))
 
         if 'node_speedlimit' not in config or 'users_table' in self._config:
             self.bandwidth = 0
@@ -1904,11 +1849,9 @@ class TCPRelay(object):
             listen_port = config['server_port']
         self._listen_port = listen_port
 
-        addrs = socket.getaddrinfo(listen_addr, listen_port, 0,
-                                   socket.SOCK_STREAM, socket.SOL_TCP)
+        addrs = socket.getaddrinfo(listen_addr, listen_port, 0, socket.SOCK_STREAM, socket.SOL_TCP)
         if len(addrs) == 0:
-            raise Exception("can't get addrinfo for %s:%d" %
-                            (listen_addr, listen_port))
+            raise Exception("can't get addrinfo for %s:%d" % (listen_addr, listen_port))
         af, socktype, proto, canonname, sa = addrs[0]
         server_socket = socket.socket(af, socktype, proto)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -1932,8 +1875,7 @@ class TCPRelay(object):
         if self._closed:
             raise Exception('already closed')
         self._eventloop = loop
-        self._eventloop.add(self._server_socket,
-                            eventloop.POLL_IN | eventloop.POLL_ERR, self)
+        self._eventloop.add(self._server_socket, eventloop.POLL_IN | eventloop.POLL_ERR, self)
         self._eventloop.add_periodic(self.handle_periodic)
 
     def remove_handler(self, handler):
@@ -1945,9 +1887,7 @@ class TCPRelay(object):
 
     def add_connection(self, val):
         self.server_connections += val
-        logging.debug(
-            'server port %5d connections = %d' %
-            (self._listen_port, self.server_connections,))
+        logging.debug('server port %5d connections = %d' % (self._listen_port, self.server_connections,))
 
     def add_transfer_u(self, user, transfer):
         if ((user is None or user == 0) and self._config["is_multi_user"] != 0) or self._config["is_multi_user"] == 0:
@@ -1955,8 +1895,7 @@ class TCPRelay(object):
         else:
             if user not in self.mu_server_transfer_ul:
                 self.mu_server_transfer_ul[user] = 0
-            self.mu_server_transfer_ul[
-                user] += transfer + self.server_transfer_ul
+            self.mu_server_transfer_ul[user] += transfer + self.server_transfer_ul
             self.server_transfer_ul = 0
 
     def add_transfer_d(self, user, transfer):
@@ -1965,8 +1904,7 @@ class TCPRelay(object):
         else:
             if user not in self.mu_server_transfer_dl:
                 self.mu_server_transfer_dl[user] = 0
-            self.mu_server_transfer_dl[
-                user] += transfer + self.server_transfer_dl
+            self.mu_server_transfer_dl[user] += transfer + self.server_transfer_dl
             self.server_transfer_dl = 0
 
     def update_stat(self, port, stat_dict, val):
@@ -1985,16 +1923,10 @@ class TCPRelay(object):
         if self._stat_counter is not None:
             if self._listen_port not in self._stat_counter:
                 self._stat_counter[self._listen_port] = {}
-            newval = self._stat_counter[
-                self._listen_port].get(
-                local_addr, 0) + val
-            logging.debug(
-                'port %d addr %s connections %d' %
-                (self._listen_port, local_addr, newval))
+            newval = self._stat_counter[self._listen_port].get(local_addr, 0) + val
+            logging.debug('port %d addr %s connections %d' % (self._listen_port, local_addr, newval))
             self._stat_counter[self._listen_port][local_addr] = newval
-            self.update_stat(
-                self._listen_port, self._stat_counter[
-                    self._listen_port], val)
+            self.update_stat(self._listen_port, self._stat_counter[self._listen_port], val)
             if newval <= 0:
                 if local_addr in self._stat_counter[self._listen_port]:
                     del self._stat_counter[self._listen_port][local_addr]
@@ -2006,12 +1938,10 @@ class TCPRelay(object):
             connections_step = 50
             if newval >= self._stat_counter.get(-1, 0) + connections_step:
                 logging.info('Total connections up to %d' % newval)
-                self._stat_counter[
-                    -1] = self._stat_counter.get(-1, 0) + connections_step
+                self._stat_counter[-1] = self._stat_counter.get(-1, 0) + connections_step
             elif newval <= self._stat_counter.get(-1, 0) - connections_step:
                 logging.info('Total connections down to %d' % newval)
-                self._stat_counter[
-                    -1] = self._stat_counter.get(-1, 0) - connections_step
+                self._stat_counter[-1] = self._stat_counter.get(-1, 0) - connections_step
 
     def update_activity(self, handler, data_len):
         if data_len and self._stat_callback:
@@ -2047,8 +1977,7 @@ class TCPRelay(object):
                         break
                     else:
                         if handler.remote_address:
-                            logging.debug('timed out: %s:%d' %
-                                          handler.remote_address)
+                            logging.debug('timed out: %s:%d' % handler.remote_address)
                         else:
                             logging.debug('timed out')
                         handler.destroy()
@@ -2069,8 +1998,7 @@ class TCPRelay(object):
         # handle events and dispatch to handlers
         handle = False
         if sock:
-            logging.log(shell.VERBOSE_LEVEL, 'fd %d %s', fd,
-                        eventloop.EVENT_NAMES.get(event, event))
+            logging.log(shell.VERBOSE_LEVEL, 'fd %d %s', fd, eventloop.EVENT_NAMES.get(event, event))
         if sock == self._server_socket:
             if event & eventloop.POLL_ERR:
                 # TODO
@@ -2080,15 +2008,16 @@ class TCPRelay(object):
             try:
                 logging.debug('accept')
                 conn = self._server_socket.accept()
-                handler = TCPRelayHandler(self, self._fd_to_handlers,
-                                          self._eventloop, conn[0], self._config,
-                                          self._dns_resolver, self._is_local)
+                handler = TCPRelayHandler(
+                    self, self._fd_to_handlers,
+                    self._eventloop, conn[0], self._config,
+                    self._dns_resolver, self._is_local
+                )
                 if handler.stage() == STAGE_DESTROYED:
                     conn[0].close()
             except (OSError, IOError) as e:
                 error_no = eventloop.errno_from_exception(e)
-                if error_no in (errno.EAGAIN, errno.EINPROGRESS,
-                                errno.EWOULDBLOCK):
+                if error_no in (errno.EAGAIN, errno.EINPROGRESS, errno.EWOULDBLOCK):
                     return
                 else:
                     shell.print_exception(e)
@@ -2181,36 +2110,32 @@ class TCPRelay(object):
     def modify_multi_user_table(self, new_table):
         self.multi_user_table = new_table.copy()
         self.multi_user_host_table = {}
+        self.multi_user_token_table = {}
 
         for id in self.multi_user_table:
             if id not in self.mu_reset_time:
                 self.mu_reset_time[id] = time.time()
 
-            self.multi_user_host_table[common.get_mu_host(
-                id, self.multi_user_table[id]['md5'])] = id
+            self.multi_user_token_table[self.multi_user_table[id]['token']] = id
+            self.multi_user_host_table[common.get_mu_host(id, self.multi_user_table[id]['md5'])] = id
+
             if self.multi_user_table[id]['forbidden_ip'] is not None:
-                self.multi_user_table[id]['_forbidden_iplist'] = IPNetwork(
-                    str(self.multi_user_table[id]['forbidden_ip']))
+                self.multi_user_table[id]['_forbidden_iplist'] = IPNetwork(str(self.multi_user_table[id]['forbidden_ip']))
             else:
-                self.multi_user_table[id][
-                    '_forbidden_iplist'] = IPNetwork(str(""))
+                self.multi_user_table[id]['_forbidden_iplist'] = IPNetwork(str(""))
             if self.multi_user_table[id]['disconnect_ip'] is not None:
-                self.multi_user_table[id]['_disconnect_ipset'] = IPNetwork(
-                        str(self.multi_user_table[id]['disconnect_ip']))
+                self.multi_user_table[id]['_disconnect_ipset'] = IPNetwork(str(self.multi_user_table[id]['disconnect_ip']))
             else:
                 self.multi_user_table[id]['_disconnect_ipset'] = None
             if self.multi_user_table[id]['forbidden_port'] is not None:
-                self.multi_user_table[id]['_forbidden_portset'] = PortRange(
-                    str(self.multi_user_table[id]['forbidden_port']))
+                self.multi_user_table[id]['_forbidden_portset'] = PortRange(str(self.multi_user_table[id]['forbidden_port']))
             else:
-                self.multi_user_table[id][
-                    '_forbidden_portset'] = PortRange(str(""))
+                self.multi_user_table[id]['_forbidden_portset'] = PortRange(str(""))
 
             if 'node_speedlimit' not in self.multi_user_table[id]:
                 bandwidth = 0
             else:
-                bandwidth = float(
-                    self.multi_user_table[id]['node_speedlimit']) * 128
+                bandwidth = float(self.multi_user_table[id]['node_speedlimit']) * 128
 
             self.mu_speed_tester_u[id] = SpeedTester(bandwidth)
             self.mu_speed_tester_d[id] = SpeedTester(bandwidth)

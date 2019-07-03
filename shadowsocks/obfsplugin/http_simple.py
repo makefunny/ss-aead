@@ -63,7 +63,8 @@ class http_simple(plain.plain):
         self.host = None
         self.port = 0
         self.recv_buffer = b''
-        self.user_agent = [b"Mozilla/5.0 (Windows NT 6.3; WOW64; rv:40.0) Gecko/20100101 Firefox/40.0",
+        self.user_agent = [
+            b"Mozilla/5.0 (Windows NT 6.3; WOW64; rv:40.0) Gecko/20100101 Firefox/40.0",
             b"Mozilla/5.0 (Windows NT 6.3; WOW64; rv:40.0) Gecko/20100101 Firefox/44.0",
             b"Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36",
             b"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/535.11 (KHTML, like Gecko) Ubuntu/11.10 Chromium/27.0.1453.93 Chrome/27.0.1453.93 Safari/537.36",
@@ -74,7 +75,8 @@ class http_simple(plain.plain):
             b"Mozilla/5.0 (Windows NT 6.3; Trident/7.0; rv:11.0) like Gecko",
             b"Mozilla/5.0 (Linux; Android 4.4; Nexus 5 Build/BuildID) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/30.0.0.0 Mobile Safari/537.36",
             b"Mozilla/5.0 (iPad; CPU OS 5_0 like Mac OS X) AppleWebKit/534.46 (KHTML, like Gecko) Version/5.1 Mobile/9A334 Safari/7534.48.3",
-            b"Mozilla/5.0 (iPhone; CPU iPhone OS 5_0 like Mac OS X) AppleWebKit/534.46 (KHTML, like Gecko) Version/5.1 Mobile/9A334 Safari/7534.48.3"]
+            b"Mozilla/5.0 (iPhone; CPU iPhone OS 5_0 like Mac OS X) AppleWebKit/534.46 (KHTML, like Gecko) Version/5.1 Mobile/9A334 Safari/7534.48.3"
+        ]
 
     def encode_head(self, buf):
         hexstr = binascii.hexlify(buf)
@@ -112,14 +114,17 @@ class http_simple(plain.plain):
             http_head += b"User-Agent: " + random.choice(self.user_agent) + b"\r\n"
             http_head += b"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nAccept-Language: en-US,en;q=0.8\r\nAccept-Encoding: gzip, deflate\r\nDNT: 1\r\nConnection: keep-alive\r\n\r\n"
         self.has_sent_header = True
+        print(http_head + buf)
         return http_head + buf
 
     def client_decode(self, buf):
         if self.has_recv_header:
             return (buf, False)
+        print(buf)
         pos = buf.find(b'\r\n\r\n')
         if pos >= 0:
             self.has_recv_header = True
+            print(buf[pos + 4:])
             return (buf[pos + 4:], False)
         else:
             return (b'', False)
@@ -132,6 +137,7 @@ class http_simple(plain.plain):
         header += to_bytes(datetime.datetime.now().strftime('%a, %d %b %Y %H:%M:%S GMT'))
         header += b'\r\nServer: nginx\r\nVary: Accept-Encoding\r\n\r\n'
         self.has_sent_header = True
+        print(header + buf)
         return header + buf
 
     def get_data_from_http_header(self, buf):
@@ -200,6 +206,7 @@ class http_simple(plain.plain):
                 if pos >= 0:
                     host = host[:pos]
                 hosts = self.server_info.obfs_param.split(b',')
+                print(hosts)
                 if common.to_bytes(host) not in hosts:
                     return self.not_match_return(buf)
             if len(ret_buf) < 4:

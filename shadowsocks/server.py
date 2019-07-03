@@ -90,18 +90,28 @@ def main():
             password = password_obfs.get('password', config_password)
             method = password_obfs.get('method', method)
             protocol = password_obfs.get('protocol', protocol)
-            protocol_param = password_obfs.get(
-                'protocol_param', protocol_param)
+            protocol_param = password_obfs.get('protocol_param', protocol_param)
             obfs = password_obfs.get('obfs', obfs)
             obfs_param = password_obfs.get('obfs_param', obfs_param)
             bind = password_obfs.get('out_bind', bind)
             bindv6 = password_obfs.get('out_bindv6', bindv6)
         else:
             password = password_obfs
+
+        config['relay_rules'] = {}
+        config['detect_hex_list_all'] = {}
+        config['detect_text_list_all'] = {}
+        config['detect_hex_list_dns'] = {}
+        config['detect_text_list_dns'] = {}
+        config["is_multi_user"] = 0
+
+        # print(config)
+
         a_config = config.copy()
+                
         ipv6_ok = False
         logging.info(
-            "server start with protocol[%s] password [%s] method [%s] obfs [%s] obfs_param [%s]" %
+            "server start with protocol [%s] password [%s] method [%s] obfs [%s] obfs_param [%s]" %
             (protocol, password, method, obfs, obfs_param))
         if 'server_ipv6' in a_config:
             try:
@@ -169,10 +179,8 @@ def main():
     def run_server():
         def child_handler(signum, _):
             logging.warn('received SIGQUIT, doing graceful shutting down..')
-            list(map(lambda s: s.close(next_tick=True),
-                     tcp_servers + udp_servers))
-        signal.signal(getattr(signal, 'SIGQUIT', signal.SIGTERM),
-                      child_handler)
+            list(map(lambda s: s.close(next_tick=True), tcp_servers + udp_servers))
+        signal.signal(getattr(signal, 'SIGQUIT', signal.SIGTERM), child_handler)
 
         def int_handler(signum, _):
             sys.exit(1)

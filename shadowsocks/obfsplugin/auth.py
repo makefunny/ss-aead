@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 #
 # Copyright 2015-2015 breakwa11
 #
@@ -1220,7 +1221,9 @@ class auth_aes128_sha1(auth_base):
         return buf + hmac.new(user_key, buf, self.hashfunc).digest()[:4]
 
     def server_udp_post_decrypt(self, buf):
+        # 获取用户id
         uid = struct.unpack('<I', buf[-8:-4])[0]
+        print('data uid', buf, uid)
         if uid in self.server_info.users and self.server_info.is_multi_user != 0:
             user_key = self.hashfunc(self.server_info.users[uid]['passwd'].encode('utf-8')).digest()
         else:

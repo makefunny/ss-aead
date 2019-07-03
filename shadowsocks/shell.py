@@ -168,8 +168,7 @@ def check_config(config, is_local):
 def get_config(is_local):
     global verbose
 
-    logging.basicConfig(level=logging.INFO,
-                        format='%(levelname)-s: %(message)s')
+    logging.basicConfig(level=logging.INFO, format='%(levelname)-s: %(message)s')
     if is_local:
         shortopts = 'hd:s:b:p:k:l:m:O:o:G:g:c:t:vq'
         longopts = ['help', 'fast-open', 'pid-file=', 'log-file=', 'user=',

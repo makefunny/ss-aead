@@ -45,6 +45,13 @@ def main():
 
     config = shell.get_config(True)
 
+    config['relay_rules'] = {}
+    config['detect_hex_list_all'] = {}
+    config['detect_text_list_all'] = {}
+    config['detect_hex_list_dns'] = {}
+    config['detect_text_list_dns'] = {}
+    config["is_multi_user"] = 0
+
     if not config.get('dns_ipv6', False):
         asyncdns.IPV6_CONNECTION_SUPPORT = False
 
@@ -55,15 +62,16 @@ def main():
          config['password'],
          config['method'],
          config['obfs'],
-         config['obfs_param']))
+         config['obfs_param'])
+    )
 
     try:
-        logging.info("starting local at %s:%d" %
-                     (config['local_address'], config['local_port']))
+        logging.info("starting local at %s:%d" % (config['local_address'], config['local_port']))
 
         dns_resolver = asyncdns.DNSResolver()
         tcp_server = tcprelay.TCPRelay(config, dns_resolver, True)
         udp_server = udprelay.UDPRelay(config, dns_resolver, True)
+
         loop = eventloop.EventLoop()
         dns_resolver.add_to_loop(loop)
         tcp_server.add_to_loop(loop)

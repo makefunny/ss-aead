@@ -183,7 +183,12 @@ class UDPRelay(object):
         self.is_cleaning_mu_connected_iplist = False
 
         if 'users_table' in self._config:
+            self.multi_user_host_table = {}
+            self.multi_user_token_table = {}
             self.multi_user_table = self._config['users_table']
+            for id in self.multi_user_table:
+                self.multi_user_token_table[self.multi_user_table[id]['token']] = id
+                self.multi_user_host_table[common.get_mu_host(id, self.multi_user_table[id]['md5'])] = id
 
         self.mu_server_transfer_ul = {}
         self.mu_server_transfer_dl = {}
@@ -251,8 +256,7 @@ class UDPRelay(object):
         self._relay_rules = self._config['relay_rules'].copy()
         self._is_pushing_relay_rules = False
 
-        addrs = socket.getaddrinfo(self._listen_addr, self._listen_port, 0,
-                                   socket.SOCK_DGRAM, socket.SOL_UDP)
+        addrs = socket.getaddrinfo(self._listen_addr, self._listen_port, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
         if len(addrs) == 0:
             raise Exception("can't get addrinfo for %s:%d" %
                             (self._listen_addr, self._listen_port))
@@ -324,8 +328,7 @@ class UDPRelay(object):
             if len(data) >= 8:
                 crc = binascii.crc32(data) & 0xffffffff
                 if crc != 0xffffffff:
-                    logging.warn('uncorrect CRC32, maybe wrong password or '
-                                 'encryption method')
+                    logging.warn('uncorrect CRC32, maybe wrong password or encryption method')
                     return None
                 cmd = common.ord(data[1])
                 request_id = struct.unpack('>H', data[2:4])[0]
@@ -334,15 +337,13 @@ class UDPRelay(object):
             elif len(data) >= 6 and common.ord(data[1]) == 0x0:
                 crc = binascii.crc32(data) & 0xffffffff
                 if crc != 0xffffffff:
-                    logging.warn('uncorrect CRC32, maybe wrong password or '
-                                 'encryption method')
+                    logging.warn('uncorrect CRC32, maybe wrong password or encryption method')
                     return None
                 cmd = common.ord(data[1])
                 data = data[2:-4]
                 return (cmd, 0, data)
             else:
-                logging.warn('header too short, maybe wrong password or '
-                             'encryption method')
+                logging.warn('header too short, maybe wrong password or encryption method')
                 return None
         return data
 
@@ -452,6 +453,7 @@ class UDPRelay(object):
     def _handle_server(self):
         server = self._server_socket
         data, r_addr = server.recvfrom(BUF_SIZE)
+        # print('udp_data', data)
         ogn_data = data
         if not data:
             logging.debug('UDP handle_server: data is empty')
@@ -467,9 +469,8 @@ class UDPRelay(object):
                 data = data[3:]
         else:
             try:
-                data, key, ref_iv = encrypt.decrypt_all(self._password,
-                                                    self._method,
-                                                    data)
+                data, key, ref_iv = encrypt.decrypt_all(self._password, self._method, data)
+                # print('udp_data', data)
             except Exception:
                 logging.debug('UDP handle_server: decrypt data failed')
                 return
@@ -480,7 +481,22 @@ class UDPRelay(object):
                 return
             ref_iv = [0]
             self._protocol.obfs.server_info.recv_iv = ref_iv[0]
-            data, uid = self._protocol.server_udp_post_decrypt(data)
+            if self._config['is_multi_user'] == 3 and self._config["protocol"] == b"auth_simple":
+                data, token = self._protocol.server_udp_post_decrypt(data)
+                # logging.info('data token %s %s' % (data, token))
+                token = token.decode('utf8')
+                try:
+                    if token in self.multi_user_token_table:
+                        uid = self.multi_user_token_table[token]
+                    else:
+                        is_Failed = True
+                        raise Exception('Error token:%s' % token)
+                except Exception as e:
+                    is_Failed = True
+                    raise Exception('Error get token')
+            else:
+                data, uid = self._protocol.server_udp_post_decrypt(data)
+                logging.info('data uid %s %d', data, uid)
 
             if self._config['is_multi_user'] != 0 and data:
                 if uid:
@@ -632,8 +648,7 @@ class UDPRelay(object):
                                 self.detect_text_list[id]['regex'],
                                 str(data)):
                             if self._config['is_multi_user'] != 0 and uid != 0:
-                                if self.is_cleaning_mu_detect_log_list == False and id not in self.mu_detect_log_list[
-                                        uid]:
+                                if self.is_cleaning_mu_detect_log_list == False and id not in self.mu_detect_log_list[uid]:
                                     self.mu_detect_log_list[uid].append(id)
                             else:
                                 if self.is_cleaning_detect_log == False and id not in self.detect_log_list:
@@ -653,8 +668,7 @@ class UDPRelay(object):
                                 self.detect_hex_list[id]['regex'],
                                 binascii.hexlify(data)):
                             if self._config['is_multi_user'] != 0 and uid != 0:
-                                if self.is_cleaning_mu_detect_log_list == False and id not in self.mu_detect_log_list[
-                                        uid]:
+                                if self.is_cleaning_mu_detect_log_list == False and id not in self.mu_detect_log_list[uid]:
                                     self.mu_detect_log_list[uid].append(id)
                             else:
                                 if self.is_cleaning_detect_log == False and id not in self.detect_log_list:
@@ -682,11 +696,9 @@ class UDPRelay(object):
                             self._listen_port,
                             binascii.hexlify(data)))
                 if self._config['is_multi_user'] != 2:
-                    if common.to_str(r_addr[0]) in self.wrong_iplist and r_addr[
-                            0] != 0 and self.is_cleaning_wrong_iplist == False:
+                    if common.to_str(r_addr[0]) in self.wrong_iplist and r_addr[0] != 0 and self.is_cleaning_wrong_iplist == False:
                         del self.wrong_iplist[common.to_str(r_addr[0])]
-                    if common.getRealIp(r_addr[0]) not in self.connected_iplist and r_addr[
-                            0] != 0 and self.is_cleaning_connected_iplist == False:
+                    if common.getRealIp(r_addr[0]) not in self.connected_iplist and r_addr[0] != 0 and self.is_cleaning_connected_iplist == False:
                         self.connected_iplist.append(common.getRealIp(r_addr[0]))
             else:
                 client, client_uid = client_pair
@@ -697,11 +709,13 @@ class UDPRelay(object):
                 try:
                     key, ref_iv, m = encrypt.gen_key_iv(self._password, self._method)
                     self._protocol.obfs.server_info.iv = ref_iv[0]
+                    # logging.info(data)
                     data = self._protocol.client_udp_pre_encrypt(data)
+                    # logging.info(data)
                     #logging.debug("%s" % (binascii.hexlify(data),))
                     data = encrypt.encrypt_all_m(key, ref_iv, m, self._method, data)
-                except Exception:
-                    logging.debug("UDP handle_server: encrypt data failed")
+                except Exception as e:
+                    logging.debug(e)
                     return
                 if not data:
                     return
@@ -756,14 +770,14 @@ class UDPRelay(object):
                 return
 
             origin_data = data[:]
+            # print(data)
 
             data = pack_addr(r_addr[0]) + struct.pack('>H', r_addr[1]) + data
             try:
                 ref_iv = [encrypt.encrypt_new_iv(self._method)]
                 self._protocol.obfs.server_info.iv = ref_iv[0]
                 data = self._protocol.server_udp_pre_encrypt(data, client_uid)
-                response = encrypt.encrypt_all(self._password,
-                                               self._method, data)
+                response = encrypt.encrypt_all(self._password, self._method, data)
             except Exception:
                 logging.debug("UDP handle_client: encrypt data failed")
                 return
@@ -771,8 +785,7 @@ class UDPRelay(object):
                 return
         else:
             try:
-                data, key, ref_iv = encrypt.decrypt_all(self._password,
-                                                    self._method, data)
+                data, key, ref_iv = encrypt.decrypt_all(self._password, self._method, data)
             except Exception:
                 logging.debug('UDP handle_client: decrypt data failed')
                 return
@@ -788,12 +801,15 @@ class UDPRelay(object):
 
             response = b'\x00\x00\x00' + data
 
+        # print(client_addr, client, data)
         if client_addr:
             if client_uid:
                 self.add_transfer_d(client_uid, len(response))
             else:
                 self.server_transfer_dl += len(response)
 
+            # print(origin_data)
+            origin_data = data[:]
             if self._is_relay(r_addr, origin_data, client_uid):
                 response = origin_data
 
@@ -918,6 +934,7 @@ class UDPRelay(object):
             try:
                 self._handle_client(sock)
             except Exception as e:
+                # print(e)
                 shell.print_exception(e)
                 if self._config['verbose']:
                     traceback.print_exc()
@@ -1004,29 +1021,26 @@ class UDPRelay(object):
     def modify_multi_user_table(self, new_table):
         self.multi_user_table = new_table.copy()
         self.multi_user_host_table = {}
+        self.multi_user_token_table = {}
 
         self._protocol.obfs.server_info.users = self.multi_user_table
 
         for id in self.multi_user_table:
-            self.multi_user_host_table[common.get_mu_host(
-                id, self.multi_user_table[id]['md5'])] = id
+            self.multi_user_token_table[self.multi_user_table[id]['token']] = id
+            self.multi_user_host_table[common.get_mu_host(id, self.multi_user_table[id]['md5'])] = id
+            
             if self.multi_user_table[id]['forbidden_ip'] is not None:
-                self.multi_user_table[id]['_forbidden_iplist'] = IPNetwork(
-                    str(self.multi_user_table[id]['forbidden_ip']))
+                self.multi_user_table[id]['_forbidden_iplist'] = IPNetwork(str(self.multi_user_table[id]['forbidden_ip']))
             else:
-                self.multi_user_table[id][
-                    '_forbidden_iplist'] = IPNetwork(str(""))
+                self.multi_user_table[id]['_forbidden_iplist'] = IPNetwork(str(""))
             if self.multi_user_table[id]['disconnect_ip'] is not None:
-                self.multi_user_table[id]['_disconnect_ipset'] = IPNetwork(
-                    str(self.multi_user_table[id]['disconnect_ip']))
+                self.multi_user_table[id]['_disconnect_ipset'] = IPNetwork(str(self.multi_user_table[id]['disconnect_ip']))
             else:
                 self.multi_user_table[id]['_disconnect_ipset'] = None
             if self.multi_user_table[id]['forbidden_port'] is not None:
-                self.multi_user_table[id]['_forbidden_portset'] = PortRange(
-                    str(self.multi_user_table[id]['forbidden_port']))
+                self.multi_user_table[id]['_forbidden_portset'] = PortRange(str(self.multi_user_table[id]['forbidden_port']))
             else:
-                self.multi_user_table[id][
-                    '_forbidden_portset'] = PortRange(str(""))
+                self.multi_user_table[id]['_forbidden_portset'] = PortRange(str(""))
 
     def push_relay_rules(self, rules):
         self._is_pushing_relay_rules = True
