@@ -577,8 +577,7 @@ class UDPRelay(object):
             user_id = uid
         try:
             server_port = remote_addr[1]
-            addrs = socket.getaddrinfo(server_addr, server_port, 0,
-                                        socket.SOCK_DGRAM, socket.SOL_UDP)
+            addrs = socket.getaddrinfo(server_addr, server_port, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
             if not addrs: # drop
                 return
             af, socktype, proto, canonname, sa = addrs[0]

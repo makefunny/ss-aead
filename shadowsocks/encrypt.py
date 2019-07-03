@@ -142,6 +142,7 @@ class Encryptor(object):
             return self.cipher_iv + self.cipher.encrypt(buf)
 
     def decrypt(self, buf):
+        # print(self.password)
         if len(buf) == 0:
             return buf
         if self.decipher is None:

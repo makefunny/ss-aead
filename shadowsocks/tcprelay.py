@@ -1304,9 +1304,9 @@ class TCPRelayHandler(object):
                         else:
                             data = obfs_decode[0]
 
-                        if self._server._config["protocol"] == b"auth_simple":
-                            # uid = 
-                            pass
+                        if not data:
+                            # print(self._server.multi_user_token_table)
+                            raise Exception('Error data is null')
 
                         # 混淆式 单端口多用户
                         # print(self._current_user_id,len(data),data)
