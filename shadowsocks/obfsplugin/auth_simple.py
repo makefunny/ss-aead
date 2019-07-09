@@ -29,7 +29,7 @@ def create_auth_simple(method):
     return auth_simple(method)
 
 obfs_map = {
-        'auth_simple': (create_auth_simple,),
+    'auth_simple': (create_auth_simple,),
 }
 
 class auth_simple(object):
@@ -38,6 +38,8 @@ class auth_simple(object):
         self.server_info = None
         self.has_sent_header = False
         self.has_recv_header = False
+
+        self.debug_token = b'test'
 
     def init_data(self):
         return b''
@@ -55,10 +57,10 @@ class auth_simple(object):
     # buf   => less than 65535
     # struct.pack(">H", len(buf)) => length == 2
     def client_pre_encrypt(self, buf):
-        token=b'exampletoken'
-        # logging.info('client_pre_encrypt >> %d %s' % (len(buf),buf))
+        token=self.debug_token
         result = bytes([len(token)])+token + struct.pack(">H", len(buf))+buf
-        # logging.info('client_pre_encrypted >> %d %s' % (len(result),result))
+        logging.debug('client_pre_encrypt   >> tcp >> %s' % buf)
+        logging.debug('client_pre_encrypted >> tcp >> %s' % result)
         return result
 
     def client_encode(self, buf):
@@ -70,19 +72,14 @@ class auth_simple(object):
         return (buf, False)
 
     def client_post_decrypt(self, buf):
-        # logging.info('client_post_decrypt >> %s' % buf)
+        logging.debug('client_post_decrypt >> %s' % buf)
         return buf
 
     # 服务器 => 客户端
     def server_pre_encrypt(self, buf):
         # 此处对raw data进行预处理，之后根据加密方式进行加密
-        # logging.info('server_pre_encrypt >> tcp-buf %s' % buf)
+        # logging.debug('server_pre_encrypt >> tcp-buf %s' % buf)
         return buf
-        # token=b'exampletoken'
-        # logging.info('client_pre_encrypt >> %d %s' % (len(buf),buf))
-        # result = bytes([len(token)])+token + struct.pack(">H", len(buf))+buf
-        # logging.info('client_pre_encrypted >> %d %s' % (len(result),result))
-        # return result
 
     def server_encode(self, buf):
         # logging.info('server_encode >> tcp-buf %s' % buf)
@@ -95,8 +92,6 @@ class auth_simple(object):
 
     # 解密 客户端 => 服务端
     def server_post_decrypt(self, buf):
-        # print('对解密结果进行二次处理 >> tcp-buf ' , buf)
-        # logging.info('server_post_decrypt >> tcp-buf %s' % buf)
 
         is_Body = False
         body = b''
@@ -108,6 +103,7 @@ class auth_simple(object):
         # len(buf)-1 => 最后一位可读index
 
         length_index = 0
+        logging.debug('server_post_decrypt   >> tcp-length_index >> %d' % length_index)
         while length_index < len(buf)-1:
             if is_Body==False:
                 LENGTH_LENGTH=TOKEN_LENGTH_LENGTH
@@ -117,6 +113,8 @@ class auth_simple(object):
                 elif token!=buf[length_index+LENGTH_LENGTH:length_index+LENGTH_LENGTH+length]:
                     raise Exception('Token dismatch')
                 is_Body=True
+
+                logging.debug('server_post_decrypt   >> tcp-length_index:%d >> head-length:%d' % (length_index, length))
 
                 if length_index+LENGTH_LENGTH+length == len(buf):
                     # end
@@ -128,8 +126,12 @@ class auth_simple(object):
             else:
                 LENGTH_LENGTH=BODY_LENGTH_LENGTH
                 length  =  struct.unpack(">H", buf[length_index:length_index+LENGTH_LENGTH])[0]
+                if length > len(buf):
+                    raise Exception('Error body length too large:%d buf:%d' % (length, len(buf)))
                 body    += buf[length_index+LENGTH_LENGTH:length_index+LENGTH_LENGTH+length]
                 is_Body =  False
+
+                logging.debug('server_post_decrypt   >> tcp-length_index:%d >> body-lenght:%d' % (length_index, length))
 
                 if length_index+LENGTH_LENGTH+length == len(buf):
                     # end
@@ -140,47 +142,16 @@ class auth_simple(object):
 
             length_index=length_index+LENGTH_LENGTH+length
 
+        logging.debug('server_post_decrypt   >> tcp >> %d %s' % (len(buf),buf))
+        logging.debug('server_post_decrypted >> tcp >> %d %s' % (len(body),body))
 
         return (body, False, token)
 
-        token_len = ord(buf[0])
-        index = head_len+1
-        token = buf[1:token_len+1]
 
-        if token_len+1 == len(buf):
-            return (b'', False, token)
-        elif token_len+1 == len(buf)-1:
-            raise Exception('Error body_len')
-
-
-
-        head_len = ord(buf[0])
-
-        # buf[0] => head_len
-        # buf[1:head_len+1] => head
-        # buf[head_len+1] => token_len
-        # buf[head_len+2:head_len+2+ord(buf[head_len+1])] => token
-        # buf[head_len+2+ord(buf[head_len+1]):] => req body
-
-        if head_len+1 == len(buf):
-            return 
-
-        return (buf[1:head_len+1] + buf[head_len+2+ord(buf[head_len+1]):], False, buf[head_len+2:head_len+2+ord(buf[head_len+1])])
-
-
-        # if not self.has_recv_header:
-        #     logging.info('self.has_recv_header == True')
-        #     # print('self.has_sent_header == false')
-        #     self.has_recv_header = True
-        #     return (buf, False)
-        # else:
-        #     return (buf[1:], False)
-
-    # def client_udp_pre_encrypt(self, buf, token):
     def client_udp_pre_encrypt(self,buf):
-        token=b'exampletoken'
+        token=self.debug_token
         # header 跟body一起，不确定位置，token放后面
-        # logging.info('client_udp_pre_encrypt >> udp-buf %s' % buf)
+        # logging.debug('client_udp_pre_encrypt >> udp-buf %s' % buf)
         return buf + token+bytes([len(token)])
         # return buf
 
@@ -198,7 +169,9 @@ class auth_simple(object):
     def server_udp_post_decrypt(self, buf):
         # logging.info('udp-buf %s' % buf)
         token_len = ord(buf[-1])
-        # print(token_len,buf[:len(buf)-token_len-1], buf[-token_len-1:-1])
+        # print(token_len, buf[:len(buf)-token_len-1], buf[-token_len-1:-1])
+        logging.debug('server_udp_post_decrypt => %s' % buf)
+        logging.debug('server_udp_post_decrypted => %s' % buf[:len(buf)-token_len-1])
         return (buf[:len(buf)-token_len-1], buf[-token_len-1:-1])
         # return (buf, None)
 

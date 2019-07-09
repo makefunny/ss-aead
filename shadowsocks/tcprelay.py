@@ -1341,16 +1341,13 @@ class TCPRelayHandler(object):
                             if self._server._config["protocol"] == b"auth_simple" and self._server._config["is_multi_user"] == 3:
                                 data, sendback, token = self._protocol.server_post_decrypt(data)
                                 token = token.decode('utf8')
+                                # print(token, self._server.multi_user_token_table)
                                 try:
-                                    # print(token, self._server.multi_user_token_table)
                                     # logging.info('%s %s' % (token, data))
                                     if token in self._server.multi_user_token_table:
                                         # 根据 host_name 确定用户
                                         self._update_user(self._server.multi_user_token_table[token])
                                     else:
-                                        logging.error(
-                                            'The host:%s md5 is mismatch,so The connection has been rejected, when connect from %s:%d via port %d' %
-                                            (host_name, self._client_address[0], self._client_address[1], self._server._listen_port))
                                         is_Failed = True
                                         raise Exception('Error token %s %s' % (data, token))
                                 except Exception as e:
@@ -1387,7 +1384,7 @@ class TCPRelayHandler(object):
                                     self.destroy()
                                     return
 
-                            if sendback and not is_relay:
+                            if not is_relay and sendback:
                                 backdata = self._protocol.server_pre_encrypt(b'')
                                 backdata = self._encryptor.encrypt(backdata)
                                 backdata = self._obfs.server_encode(backdata)

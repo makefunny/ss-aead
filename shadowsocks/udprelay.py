@@ -485,7 +485,11 @@ class UDPRelay(object):
                 data, token = self._protocol.server_udp_post_decrypt(data)
                 # logging.info('data token %s %s' % (data, token))
                 token = token.decode('utf8')
+                if not token:
+                    is_Failed = True
+                    raise Exception('Error token is null')
                 try:
+                    # print(self.multi_user_token_table)
                     if token in self.multi_user_token_table:
                         uid = self.multi_user_token_table[token]
                     else:
