@@ -827,21 +827,21 @@ class TCPRelayHandler(object):
                         self._server._listen_port
                     )
                 )
-            if connecttype != 0:
-                pass
-                #common.connect_log('UDP over TCP by user %d' %
-                #        (self._user_id, ))
-            else:
-                common.connect_log(
-                    '%s connecting %s:%d from %s:%d via port %d,hex data : %s' %
-                    (
-                        (connecttype == 0) and 'TCP' or 'UDP',
-                        common.to_str(remote_addr), remote_port,
-                        self._client_address[0], self._client_address[1],
-                        self._server._listen_port,
-                        binascii.hexlify(data)
-                    )
-                )
+            # if connecttype != 0:
+            #     pass
+            #     #common.connect_log('UDP over TCP by user %d' %
+            #     #        (self._user_id, ))
+            # else:
+            #     common.connect_log(
+            #         '%s connecting %s:%d from %s:%d via port %d,hex data : %s' %
+            #         (
+            #             (connecttype == 0) and 'TCP' or 'UDP',
+            #             common.to_str(remote_addr), remote_port,
+            #             self._client_address[0], self._client_address[1],
+            #             self._server._listen_port,
+            #             binascii.hexlify(data)
+            #         )
+            #     )
             if not is_error:
                 if not self._server.is_pushing_detect_text_list_all:
                     for id in self._server.detect_text_list_all:
