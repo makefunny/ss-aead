@@ -114,17 +114,17 @@ class http_simple(plain.plain):
             http_head += b"User-Agent: " + random.choice(self.user_agent) + b"\r\n"
             http_head += b"Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\nAccept-Language: en-US,en;q=0.8\r\nAccept-Encoding: gzip, deflate\r\nDNT: 1\r\nConnection: keep-alive\r\n\r\n"
         self.has_sent_header = True
-        print(http_head + buf)
+        # print(http_head + buf)
         return http_head + buf
 
     def client_decode(self, buf):
         if self.has_recv_header:
             return (buf, False)
-        print(buf)
+        # print(buf)
         pos = buf.find(b'\r\n\r\n')
         if pos >= 0:
             self.has_recv_header = True
-            print(buf[pos + 4:])
+            # print(buf[pos + 4:])
             return (buf[pos + 4:], False)
         else:
             return (b'', False)
@@ -137,7 +137,7 @@ class http_simple(plain.plain):
         header += to_bytes(datetime.datetime.now().strftime('%a, %d %b %Y %H:%M:%S GMT'))
         header += b'\r\nServer: nginx\r\nVary: Accept-Encoding\r\n\r\n'
         self.has_sent_header = True
-        print(header + buf)
+        # print(header + buf)
         return header + buf
 
     def get_data_from_http_header(self, buf):
@@ -206,7 +206,7 @@ class http_simple(plain.plain):
                 if pos >= 0:
                     host = host[:pos]
                 hosts = self.server_info.obfs_param.split(b',')
-                print(hosts)
+                # print(hosts)
                 if common.to_bytes(host) not in hosts:
                     return self.not_match_return(buf)
             if len(ret_buf) < 4:
