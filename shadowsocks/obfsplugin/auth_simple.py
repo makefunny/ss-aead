@@ -127,7 +127,7 @@ class auth_simple(object):
                 LENGTH_LENGTH=BODY_LENGTH_LENGTH
                 length  =  struct.unpack(">H", buf[length_index:length_index+LENGTH_LENGTH])[0]
                 if length > len(buf):
-                    raise Exception('Error body length too large:%d buf:%d' % (length, len(buf)))
+                    raise Exception('Error body length too large length:%s length:%d buf:%d' % (buf[length_index:length_index+LENGTH_LENGTH], length, len(buf)))
                 body    += buf[length_index+LENGTH_LENGTH:length_index+LENGTH_LENGTH+length]
                 is_Body =  False
 
