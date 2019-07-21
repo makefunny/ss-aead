@@ -52,15 +52,47 @@ class auth_simple(object):
 
     def set_server_info(self, server_info):
         self.server_info = server_info
+        logging.debug('self.server_info.tcp_mss >> %d', self.server_info.tcp_mss)
 
     # token => less than 255
     # buf   => less than 65535
     # struct.pack(">H", len(buf)) => length == 2
     def client_pre_encrypt(self, buf):
         token=self.debug_token
-        result = bytes([len(token)])+token + struct.pack(">H", len(buf))+buf
-        logging.debug('client_pre_encrypt   >> tcp >> %s' % buf)
-        logging.debug('client_pre_encrypted >> tcp >> %s' % result)
+        # result = bytes([len(token)]) + token + struct.pack(">H", len(buf)) + buf
+        # logging.debug('client_pre_encrypt   >> tcp >> length:%d >> %s' % (len(buf),buf))
+        # logging.debug('client_pre_encrypted >> tcp >> length:%d >> %s' % (len(result),result))
+        # return result
+
+        # self.server_info.tcp_mss
+
+        result = b''
+        token_block = bytes([len(token)]) + token
+        # result += token_block
+
+        split_body_len = self.server_info.tcp_mss - len(token_block)
+
+        # split_count = int(len(buf) / split_body_len)
+        split_begin = 0
+
+        while split_begin < len(buf):
+
+            if split_begin+split_body_len >= len(buf):
+                split_body_len = len(buf) - split_begin
+
+            temp_body_block = struct.pack(">H", split_body_len) + buf[split_begin:split_begin+split_body_len]
+            split_begin += split_body_len
+            result += token_block + temp_body_block
+
+            if split_begin == len(buf):
+                break
+
+
+        
+
+
+        logging.debug('client_pre_encrypt   >> tcp >> length:%d >> %s' % (len(buf),buf))
+        logging.debug('client_pre_encrypted >> tcp >> length:%d >> %s' % (len(result),result))
         return result
 
     def client_encode(self, buf):
@@ -114,7 +146,7 @@ class auth_simple(object):
                     raise Exception('Token dismatch')
                 is_Body=True
 
-                logging.debug('server_post_decrypt   >> tcp-length_index:%d >> head-length:%d' % (length_index, length))
+                logging.debug('server_post_decrypt   >> tcp-length_index:%d >> token-length:%d' % (length_index, length))
 
                 if length_index+LENGTH_LENGTH+length == len(buf):
                     # end
