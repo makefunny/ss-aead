@@ -41,6 +41,7 @@ method_supported.update(simple_obfs_tls.obfs_map)
 class server_info(object):
 
     def __init__(self, data):
+        # print(data)
         self.data = data
 
 
@@ -50,6 +51,7 @@ class obfs(object):
         method = common.to_str(method)
         self.method = method
         self._method_info = self.get_method_info(method)
+        # print(self._method_info, method)
         if self._method_info:
             self.obfs = self.get_obfs(method)
         else:
@@ -59,9 +61,15 @@ class obfs(object):
         return self.obfs.init_data()
 
     def set_server_info(self, server_info):
+        import traceback
+        # traceback.print_stack()
+        # print(server_info, dir(server_info))
         return self.obfs.set_server_info(server_info)
 
     def get_server_info(self):
+        # print('obfs.py', dir(self.obfs), self.obfs, self.obfs.get_server_info())
+        # print(self.obfs.get_server_info())
+        # print(self.obfs, dir(self.obfs))
         return self.obfs.get_server_info()
 
     def get_method_info(self, method):

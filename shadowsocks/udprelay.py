@@ -160,11 +160,8 @@ class UDPRelay(object):
         self._timeout = config['timeout']
         self._is_local = is_local
         self._udp_cache_size = config['udp_cache']
-        self._cache = lru_cache.LRUCache(
-            timeout=config['udp_timeout'],
-            close_callback=self._close_client_pair)
-        self._cache_dns_client = lru_cache.LRUCache(
-            timeout=10, close_callback=self._close_client_pair)
+        self._cache = lru_cache.LRUCache(timeout=config['udp_timeout'], close_callback=self._close_client_pair)
+        self._cache_dns_client = lru_cache.LRUCache(timeout=10, close_callback=self._close_client_pair)
         self._client_fd_to_server_addr = {}
         #self._dns_cache = lru_cache.LRUCache(timeout=1800)
         self._eventloop = None
@@ -205,10 +202,17 @@ class UDPRelay(object):
         server_info = obfs.server_info(self.protocol_data)
         server_info.host = self._listen_addr
         server_info.port = self._listen_port
-        if 'users_table' in self._config:
-            server_info.users = self.multi_user_table
-        else:
-            server_info.users = {}
+        # if 'users_table' in self._config:
+        #     server_info.users = self.multi_user_table
+        # else:
+        #     server_info.users = {}
+        server_info.users = {}
+        server_info.tokens = {}
+        if 'users_table' in config:
+            if config['protocol'] == b'auth_simple':
+                server_info.tokens = self.multi_user_token_table
+            else:
+                server_info.users  = self.multi_user_table
         server_info.is_multi_user = config["is_multi_user"]
         server_info.protocol_param = config['protocol_param']
         server_info.obfs_param = ''
@@ -220,6 +224,8 @@ class UDPRelay(object):
         except Exception:
             logging.error("UDP: method not support")
             server_info.key = b''
+        server_info.decipher_iv_len = 16
+        # server_info.decipher_iv_len = self._encryptor._method_info[encrypt.METHOD_INFO_IV_LEN]
         server_info.head_len = 30
         server_info.tcp_mss = 1452
         server_info.buffer_size = BUF_SIZE
@@ -258,8 +264,7 @@ class UDPRelay(object):
 
         addrs = socket.getaddrinfo(self._listen_addr, self._listen_port, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
         if len(addrs) == 0:
-            raise Exception("can't get addrinfo for %s:%d" %
-                            (self._listen_addr, self._listen_port))
+            raise Exception("can't get addrinfo for %s:%d" % (self._listen_addr, self._listen_port))
         af, socktype, proto, canonname, sa = addrs[0]
         server_socket = socket.socket(af, socktype, proto)
         server_socket.bind((self._listen_addr, self._listen_port))

@@ -1019,9 +1019,11 @@ class auth_aes128_sha1(auth_base):
             logging.debug("local_client_id %s" % (binascii.hexlify(self.server_info.data.local_client_id),))
             self.server_info.data.connection_id = struct.unpack('<I', os.urandom(4))[0] & 0xFFFFFF
         self.server_info.data.connection_id += 1
-        return b''.join([struct.pack('<I', utc_time),
-                self.server_info.data.local_client_id,
-                struct.pack('<I', self.server_info.data.connection_id)])
+        return b''.join([
+            struct.pack('<I', utc_time),
+            self.server_info.data.local_client_id,
+            struct.pack('<I', self.server_info.data.connection_id)
+        ])
 
     def client_pre_encrypt(self, buf):
         ret = b''

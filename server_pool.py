@@ -172,21 +172,22 @@ class ServerPool(object):
                 a_config['max_connect'] = 128
                 a_config['method'] = common.to_str(a_config['method'])
                 try:
-                    logging.info("starting server at %s:%d" %
-                                 (common.to_str(a_config['server']), port))
 
-                    tcp_server = tcprelay.TCPRelay(
-                        a_config, self.dns_resolver, False)
+                    # print(a_config)
+
+                    logging.info("starting server at %s:%d" % (common.to_str(a_config['server']), port))
+
+                    tcp_server = tcprelay.TCPRelay(a_config, self.dns_resolver, False)
                     tcp_server.add_to_loop(self.loop)
                     self.tcp_servers_pool.update({port: tcp_server})
 
-                    udp_server = udprelay.UDPRelay(
-                        a_config, self.dns_resolver, False)
+                    udp_server = udprelay.UDPRelay(a_config, self.dns_resolver, False)
                     udp_server.add_to_loop(self.loop)
                     self.udp_servers_pool.update({port: udp_server})
 
                 except Exception as e:
                     if not ipv6_ok:
+                        traceback.print_exc(e)
                         logging.warn("IPV4 %s " % (e,))
 
         return True
@@ -282,6 +283,7 @@ class ServerPool(object):
         ret = {}
         if port in self.tcp_servers_pool:
             tempdict = self.tcp_servers_pool[port].mu_server_transfer_ul
+            # print(tempdict)
             for id in tempdict:
                 if self.uid_port_table[id] not in ret:
                     ret[self.uid_port_table[id]] = [0, 0]

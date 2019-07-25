@@ -44,6 +44,7 @@ class plain(object):
         return 0
 
     def get_server_info(self):
+        # print('plain.py',self.server_info)
         return self.server_info
 
     def set_server_info(self, server_info):

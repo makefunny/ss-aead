@@ -446,8 +446,7 @@ class DNSResolver(object):
     def _send_req(self, hostname, qtype):
         req = build_request(hostname, qtype)
         for server in self._servers:
-            logging.debug('resolving %s with type %d using server %s',
-                          hostname, qtype, server)
+            logging.debug('resolving %s with type %d using server %s', hostname, qtype, server)
             self._sock.sendto(req, server)
 
     def resolve(self, hostname, callback):
@@ -470,8 +469,7 @@ class DNSResolver(object):
                 callback(None, Exception('invalid hostname: %s' % hostname))
                 return
             if False:
-                addrs = socket.getaddrinfo(hostname, 0, 0,
-                                       socket.SOCK_DGRAM, socket.SOL_UDP)
+                addrs = socket.getaddrinfo(hostname, 0, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
                 if addrs:
                     af, socktype, proto, canonname, sa = addrs[0]
                     logging.debug('DNS resolve %s %s' % (hostname, sa[0]) )

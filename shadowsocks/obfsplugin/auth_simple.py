@@ -41,6 +41,16 @@ class auth_simple(object):
 
         self.debug_token = b'test'
 
+        self.body_remain = 0
+
+        self.body_length_remain = 0
+        self.last_body_length   = []
+
+        self.last_token   = b''
+        self.token_remain = 0
+
+        self.uid         = 0
+
     def init_data(self):
         return b''
 
@@ -48,27 +58,64 @@ class auth_simple(object):
         return 0
 
     def get_server_info(self):
+        # print('auth_simple.py',dir(self.server_info), type(self.server_info))
         return self.server_info
 
     def set_server_info(self, server_info):
+        # print(server_info, dir(server_info))
         self.server_info = server_info
+        # print(dir(self.server_info))
+        # print(self.server_info.buffer_size)
         logging.debug('self.server_info.tcp_mss >> %d', self.server_info.tcp_mss)
+        logging.debug('self.server_info.buffer_size >> %d', self.server_info.buffer_size)
+        logging.debug('self.server_info.decipher_iv_len >> %d', self.server_info.decipher_iv_len)
 
     # token => less than 255
     # buf   => less than 65535
     # struct.pack(">H", len(buf)) => length == 2
     def client_pre_encrypt(self, buf):
         token=self.debug_token
-        # result = bytes([len(token)]) + token + struct.pack(">H", len(buf)) + buf
+        result = bytes([len(token)]) + token + struct.pack(">H", len(buf)) + buf
+        # logging.debug('client_pre_encrypted >> success >> tcp >> length:%d >> %s' % (len(result),result))
+        logging.debug('client_pre_encrypted >> success >> tcp >> length:%d' % len(result))
+        return result
+
+    def client_pre_encrypt_buff(self, buf):
+        token=self.debug_token
+        result = b''
+        token_block = bytes([len(token)]) + token
+
+        # 2 >> body_length_length
+        # split_body_len = 32752 - len(token_block) - 2
+        split_body_len = self.server_info.buffer_size - self.server_info.decipher_iv_len - len(token_block) - 2
+
+        # split_count = int(len(buf) / split_body_len)
+        split_begin = 0
+
+        while split_begin < len(buf):
+
+            if split_begin+split_body_len >= len(buf):
+                split_body_len = len(buf) - split_begin
+
+            temp_body_block = struct.pack(">H", split_body_len) + buf[split_begin:split_begin+split_body_len]
+            split_begin += split_body_len
+            result += token_block + temp_body_block
+            logging.debug('client_pre_encrypted >  body >> tcp >> length:%d:%s total_length:%d' % (split_body_len, struct.pack(">H", split_body_len), len(result)))
+
+            if split_begin == len(buf):
+                break
+
         # logging.debug('client_pre_encrypt   >> tcp >> length:%d >> %s' % (len(buf),buf))
         # logging.debug('client_pre_encrypted >> tcp >> length:%d >> %s' % (len(result),result))
-        # return result
+        # logging.debug('client_pre_encrypted >> success >> tcp >> length:%d' % len(result))
+        # logging.debug('client_pre_encrypted >> success >> tcp >> length:%d >> %s' % (len(result),result))
+        return result
 
-        # self.server_info.tcp_mss
+    def client_pre_encrypt_mss(self, buf):
+        token=self.debug_token
 
         result = b''
         token_block = bytes([len(token)]) + token
-        # result += token_block
 
         split_body_len = self.server_info.tcp_mss - len(token_block)
 
@@ -86,10 +133,6 @@ class auth_simple(object):
 
             if split_begin == len(buf):
                 break
-
-
-        
-
 
         logging.debug('client_pre_encrypt   >> tcp >> length:%d >> %s' % (len(buf),buf))
         logging.debug('client_pre_encrypted >> tcp >> length:%d >> %s' % (len(result),result))
@@ -125,28 +168,96 @@ class auth_simple(object):
     # 解密 客户端 => 服务端
     def server_post_decrypt(self, buf):
 
-        is_Body = False
         body = b''
-        token = b''
-
+        is_Body = False
+        token = ''
+        token_b = b''
         TOKEN_LENGTH_LENGTH=1
         BODY_LENGTH_LENGTH=2
         LENGTH_LENGTH=0
         # len(buf)-1 => 最后一位可读index
 
+        if self.body_remain > 0:
+            body_remain = self.body_remain
+            if body_remain > len(buf):
+                self.body_remain = body_remain - len(buf)
+                logging.debug('body_remain >> %d to %d' % (body_remain, self.body_remain))
+                return (buf[:body_remain], False, self.uid)
+            elif body_remain == len(buf):
+                self.body_remain = 0
+                logging.debug('body_remain >> %d to %d' % (body_remain, self.body_remain))
+                return (buf[:body_remain], False, self.uid)
+            else:
+                self.body_remain = 0
+                logging.debug('body_remain >> %d to %d' % (body_remain, self.body_remain))
+                body += buf[:body_remain]
+                buf  =  buf[body_remain:]
+
+        if self.token_remain > 0:
+            token_remain = self.token_remain
+
+            if self.last_token[:token_remain] != buf[token_remain:]:
+                self.token_remain = 0
+                raise Exception('Token mismatch buf[%d:] -> %s != self.last_token[:%s] -> %s' % (token_remain, buf[token_remain:], token_remain, self.last_token[:token_remain]))
+            buf  =  buf[token_remain:]
+
+            token_b = self.last_token
+            token   = token_b.decode('utf8')
+            is_Body=True
+            self.token_remain = 0
+
+        if self.body_length_remain == 1:
+            self.last_body_length.append(buf[0])
+            length  =  struct.unpack(">H", self.last_body_length)[0]
+            token_b = self.last_token
+            token   = token_b.decode('utf8')
+            is_Body=False
+            self.last_body_length = []
+            self.body_length_remain = 0
+
+            LENGTH_LENGTH=BODY_LENGTH_LENGTH
+
+            length_index = 1
+
+            body    += buf[length_index+LENGTH_LENGTH:length_index+LENGTH_LENGTH+length]
+            is_Body =  False
+
+            logging.debug('server_post_decrypt   > tcp-length_index:%d > body-lenght:%d:%s' % (length_index, length, buf[length_index:length_index+LENGTH_LENGTH]))
+
+
+
         length_index = 0
-        logging.debug('server_post_decrypt   >> tcp-length_index >> %d' % length_index)
-        while length_index < len(buf)-1:
+        logging.debug('server_post_decrypt >> begin >> tcp-length_index >> %d buf:%d' % (length_index, len(buf)))
+        while length_index < len(buf) - 1:
             if is_Body==False:
                 LENGTH_LENGTH=TOKEN_LENGTH_LENGTH
                 length = ord(buf[length_index])
-                if token==b'':
-                    token = buf[length_index+LENGTH_LENGTH:length_index+LENGTH_LENGTH+length]
-                elif token!=buf[length_index+LENGTH_LENGTH:length_index+LENGTH_LENGTH+length]:
-                    raise Exception('Token dismatch')
-                is_Body=True
 
-                logging.debug('server_post_decrypt   >> tcp-length_index:%d >> token-length:%d' % (length_index, length))
+                if token == '':
+                    token_b = buf[length_index+LENGTH_LENGTH:length_index+LENGTH_LENGTH+length]
+                    try:
+                        token   = token_b.decode('utf8')
+                    except Exception as e:
+                        # logging.debug('server_post_decrypt >> failed >> tcp >> %d %s' % (len(buf),buf))
+                        logging.debug('server_post_decrypt >> failed >> tcp >> %d' % len(buf))
+                        raise Exception('Token decode(utf8) error token_len:%d >> %s' % (length,token_b))
+                    if token not in self.server_info.tokens:
+                        # print(self.server_info.tokens)
+                        # logging.debug('server_post_decrypt >> failed >> tcp >> %d %s' % (len(buf),buf))
+                        logging.debug('server_post_decrypt >> failed >> tcp >> %d' % len(buf))
+                        raise Exception('Token not found >> %s' % token)
+                elif len(token_b) > len(buf[length_index+LENGTH_LENGTH:length_index+LENGTH_LENGTH+length]):
+                    # token在下一波
+                    self.token_remain = len(token_b) - len(buf[length_index+LENGTH_LENGTH:length_index+LENGTH_LENGTH+length])
+                    self.last_token   = token_b
+                    length_index = len(buf) - 1
+                    break
+
+                elif token_b != buf[length_index+LENGTH_LENGTH:length_index+LENGTH_LENGTH+length]:
+                    raise Exception('Token mismatch >> %s >> %s' % (token_b, buf[length_index+LENGTH_LENGTH:length_index+LENGTH_LENGTH+length]))
+
+                is_Body=True
+                logging.debug('server_post_decrypt   > tcp-length_index:%d > token-length:%d' % (length_index, length))
 
                 if length_index+LENGTH_LENGTH+length == len(buf):
                     # end
@@ -154,31 +265,42 @@ class auth_simple(object):
                 elif length_index+LENGTH_LENGTH+length == len(buf)-BODY_LENGTH_LENGTH:
                     raise Exception('Token not found')
                     break
-
             else:
                 LENGTH_LENGTH=BODY_LENGTH_LENGTH
+
+                if length_index+LENGTH_LENGTH == len(buf) + 1:
+                    logging.debug('body-lenght splited')
+                    self.last_token   = token_b
+                    self.last_body_length   = buf[-1:]
+                    self.body_length_remain = 1
+                    break
+
                 length  =  struct.unpack(">H", buf[length_index:length_index+LENGTH_LENGTH])[0]
-                if length > len(buf):
-                    raise Exception('Error body length too large length:%s length:%d buf:%d' % (buf[length_index:length_index+LENGTH_LENGTH], length, len(buf)))
+
+                if length_index+LENGTH_LENGTH+length > len(buf):
+                    body    += buf[length_index+LENGTH_LENGTH:]
+                    self.body_remain = length_index+LENGTH_LENGTH+length - len(buf)
+                    break
+                    # raise Exception('Error body length not enough length:%s:%d end:%d > len(buf):%d' % (buf[length_index:length_index+LENGTH_LENGTH], length, length_index+LENGTH_LENGTH+length, len(buf)))
+
                 body    += buf[length_index+LENGTH_LENGTH:length_index+LENGTH_LENGTH+length]
                 is_Body =  False
 
-                logging.debug('server_post_decrypt   >> tcp-length_index:%d >> body-lenght:%d' % (length_index, length))
+                logging.debug('server_post_decrypt   > tcp-length_index:%d > body-lenght:%d:%s' % (length_index, length, buf[length_index:length_index+LENGTH_LENGTH]))
 
                 if length_index+LENGTH_LENGTH+length == len(buf):
                     # end
                     break
-                elif length_index+LENGTH_LENGTH+length == len(buf)-TOKEN_LENGTH_LENGTH:
-                    raise Exception('Body not found')
-                    break
 
             length_index=length_index+LENGTH_LENGTH+length
 
-        logging.debug('server_post_decrypt   >> tcp >> %d %s' % (len(buf),buf))
-        logging.debug('server_post_decrypted >> tcp >> %d %s' % (len(body),body))
+        # logging.debug('server_post_decrypt >> success >> tcp >> %d to %d' % (len(buf), len(body)))
+        # logging.debug('server_post_decrypt >> success >> tcp >> %d %s' % (len(buf),buf))
+        # logging.debug('server_post_decrypted >> tcp >> %d %s' % (len(body),body))
 
-        return (body, False, token)
-
+        # decrypted_buf, , uid
+        self.uid = self.server_info.tokens[token]
+        return (body, False, self.server_info.tokens[token])
 
     def client_udp_pre_encrypt(self,buf):
         token=self.debug_token

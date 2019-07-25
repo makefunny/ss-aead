@@ -119,9 +119,7 @@ class Encryptor(object):
         password = common.to_bytes(password)
         m = self._method_info
         if m[METHOD_INFO_KEY_LEN] > 0:
-            key, _ = EVP_BytesToKey(password,
-                                    m[METHOD_INFO_KEY_LEN],
-                                    m[METHOD_INFO_IV_LEN])
+            key, _ = EVP_BytesToKey(password, m[METHOD_INFO_KEY_LEN], m[METHOD_INFO_IV_LEN])
         else:
             # key_length == 0 indicates we should use the key directly
             key, iv = password, b''
@@ -154,6 +152,7 @@ class Encryptor(object):
                 CIPHER_ENC_DECRYPTION,
                 decipher_iv
             )
+            # logging.debug("decipher_iv_len >> %d" % decipher_iv_len)
             buf = buf[decipher_iv_len:]
             if len(buf) == 0:
                 return buf
