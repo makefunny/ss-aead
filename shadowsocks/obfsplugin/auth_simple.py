@@ -68,7 +68,6 @@ class auth_simple(object):
         # print(self.server_info.buffer_size)
         logging.debug('self.server_info.tcp_mss >> %d', self.server_info.tcp_mss)
         logging.debug('self.server_info.buffer_size >> %d', self.server_info.buffer_size)
-        logging.debug('self.server_info.decipher_iv_len >> %d', self.server_info.decipher_iv_len)
 
     # token => less than 255
     # buf   => less than 65535

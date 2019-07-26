@@ -209,7 +209,6 @@ class TCPRelayHandler(object):
         server_info.protocol_param = ''
         server_info.obfs_param = config['obfs_param']
 
-        # server_info.decipher_iv_len = 16
         server_info.iv = self._encryptor.cipher_iv
         server_info.recv_iv = b''
         server_info.key_str = common.to_bytes(config['password'])
@@ -240,7 +239,6 @@ class TCPRelayHandler(object):
         server_info.protocol_param = config['protocol_param']
         server_info.obfs_param = ''
         server_info.iv = self._encryptor.cipher_iv
-        server_info.decipher_iv_len = self._encryptor._method_info[encrypt.METHOD_INFO_IV_LEN]
         server_info.recv_iv = b''
         server_info.key_str = common.to_bytes(config['password'])
         server_info.key = self._encryptor.key
@@ -1174,14 +1172,16 @@ class TCPRelayHandler(object):
                                 data = self._data_to_write_to_remote[0]
                                 del self._data_to_write_to_remote[0]
                                 self._write_to_sock(data, self._remote_sock)
-                        else:
-                            # netcat 
-                            # nc ip port < file
-                            while self._data_to_write_to_remote:
-                                data = self._data_to_write_to_remote[0]
-                                self._stage = STAGE_STREAM
-                                del self._data_to_write_to_remote[0]
-                                self._write_to_sock(data, self._remote_sock)
+                        # 数据传输失败时，会导致无限循环，爆cpu
+                        # 故注释
+                        # else:
+                        #     # netcat 
+                        #     # nc ip port < file
+                        #     while self._data_to_write_to_remote:
+                        #         data = self._data_to_write_to_remote[0]
+                        #         self._stage = STAGE_STREAM
+                        #         del self._data_to_write_to_remote[0]
+                        #         self._write_to_sock(data, self._remote_sock)
                     return
                 except Exception as e:
                     shell.print_exception(e)
