@@ -600,7 +600,7 @@ class DbTransfer(object):
             for column in range(len(mu_port_keys)):
                 temp_d[mu_port_keys[column]] = r[column]
             # print(temp_d)
-            d=temp_d.copy()
+            d = temp_d.copy()
             d['port'] = temp_d['port'] + temp_d['port_diff']
             d['productid'] = -1
             d['id'] = temp - 1
@@ -644,24 +644,33 @@ class DbTransfer(object):
         # 读取中转规则，如果是中转节点的话
 
         if self.is_relay:
-            self.relay_rule_list = {}
+            self.relay_rule_list    = {}
 
-            keys_relay = ['id', 'user_id', 'dist_ip', 'port', 'priority', 'dist_port']
+            keys_relay       = ['id', 'user_id', 'des_ip']
+            keys_user_method = ['port', 'method', 'passwd', 'protocol', 'protocol_param', 'obfs', 'obfs_param']
 
             cur = conn.cursor()
-            cur.execute("SELECT " +
-                        ','.join(keys_relay) +
-                        " FROM relay WHERE `source_node_id` = 0 OR `source_node_id` = " +
-                        str(get_config().NODE_ID))
+            execute_str = "SELECT a." \
+                        + ',a.'.join(keys_relay) + ", c.`port`, b." \
+                        + ',b.'.join(keys_user_method) \
+                        + " FROM relay a,user_method b,user_method c WHERE a.`src_node_id` = " + str(get_config().NODE_ID) \
+                        + " AND a.`des_user_method_id` = b.`id` AND a.`src_user_method_id` = c.`id` AND a.`is_user_method_same` = 0"
+            # print(execute_str)
+            cur.execute(execute_str)
 
             for r in cur.fetchall():
                 d = {}
                 d['id'] = int(r[0])
-                d['user_id'] = int(r[1])
-                d['dist_ip'] = str(r[2])
-                d['port'] = int(r[3])
-                d['priority'] = int(r[4])
-                d['dist_port'] = int(r[5])
+                d['user_id']   = int(r[1])
+                d['des_ip']    = str(r[2])
+                d['src_port']    = int(r[3])
+                d['des_port']    = int(r[4])
+                d['des_method']    = str(r[5])
+                d['des_passwd']    = str(r[6])
+                d['des_protocol']  = str(r[7])
+                d['des_protocol_param'] = str(r[8])
+                d['des_obfs']           = str(r[9])
+                d['des_obfs_param']     = str(r[10])
                 self.relay_rule_list[d['id']] = d
 
             cur.close()
@@ -813,7 +822,7 @@ class DbTransfer(object):
             if port not in cur_servers:
                 cur_servers[port] = passwd
             else:
-                print(len(cur_servers),cur_servers)
+                # print(len(cur_servers),cur_servers)
                 logging.error(
                     'more than one user use the same port [%s] or there is an another process bind at this port' % (port,)
                 )
@@ -830,27 +839,16 @@ class DbTransfer(object):
             if self.is_relay and row['is_multi_user'] != 2:
                 temp_relay_rules = {}
                 for id in self.relay_rule_list:
-                    if ((self.relay_rule_list[id]['user_id'] == user_id or self.relay_rule_list[id]['user_id'] == 0) or row[
-                            'is_multi_user'] != 0) and (self.relay_rule_list[id]['port'] == 0 or self.relay_rule_list[id]['port'] == port):
-                        has_higher_priority = False
-                        for priority_id in self.relay_rule_list:
-                            if (
-                                    (
-                                        self.relay_rule_list[priority_id]['priority'] > self.relay_rule_list[id]['priority'] and self.relay_rule_list[id]['id'] != self.relay_rule_list[priority_id]['id']) or (
-                                        self.relay_rule_list[priority_id]['priority'] == self.relay_rule_list[id]['priority'] and self.relay_rule_list[id]['id'] > self.relay_rule_list[priority_id]['id'])) and (
-                                    self.relay_rule_list[priority_id]['user_id'] == user_id or self.relay_rule_list[priority_id]['user_id'] == 0) and (
-                                    self.relay_rule_list[priority_id]['port'] == port or self.relay_rule_list[priority_id]['port'] == 0):
-                                has_higher_priority = True
-                                continue
-
-                        if has_higher_priority:
+                    if cfg['is_multi_user'] != 0:
+                        if self.relay_rule_list[id]['src_port'] == row['port']:
+                            temp_relay_rules[id] = self.relay_rule_list[id]
+                        else:
                             continue
-
-                        if self.relay_rule_list[id]['dist_ip'] == '0.0.0.0':
+                    else:
+                        if self.relay_rule_list[id]['user_id'] == user_id and self.relay_rule_list[id]['src_port'] == row['port']:
+                            temp_relay_rules[id] = self.relay_rule_list[id]
+                        else:
                             continue
-
-                        temp_relay_rules[id] = self.relay_rule_list[id]
-
                 cfg['relay_rules'] = temp_relay_rules.copy()
             else:
                 temp_relay_rules = {}
@@ -904,27 +902,16 @@ class DbTransfer(object):
                 if self.is_relay and row['is_multi_user'] != 2:
                     temp_relay_rules = {}
                     for id in self.relay_rule_list:
-                        if ((self.relay_rule_list[id]['user_id'] == user_id or self.relay_rule_list[id]['user_id'] == 0) or row[
-                                'is_multi_user'] != 0) and (self.relay_rule_list[id]['port'] == 0 or self.relay_rule_list[id]['port'] == port):
-                            has_higher_priority = False
-                            for priority_id in self.relay_rule_list:
-                                if (
-                                        (
-                                            self.relay_rule_list[priority_id]['priority'] > self.relay_rule_list[id]['priority'] and self.relay_rule_list[id]['id'] != self.relay_rule_list[priority_id]['id']) or (
-                                            self.relay_rule_list[priority_id]['priority'] == self.relay_rule_list[id]['priority'] and self.relay_rule_list[id]['id'] > self.relay_rule_list[priority_id]['id'])) and (
-                                        self.relay_rule_list[priority_id]['user_id'] == user_id or self.relay_rule_list[priority_id]['user_id'] == 0) and (
-                                        self.relay_rule_list[priority_id]['port'] == port or self.relay_rule_list[priority_id]['port'] == 0):
-                                    has_higher_priority = True
-                                    continue
-
-                            if has_higher_priority:
+                        if cfg['is_multi_user'] != 0:
+                            if self.relay_rule_list[id]['src_port'] == row['port']:
+                                temp_relay_rules[id] = self.relay_rule_list[id]
+                            else:
                                 continue
-
-                            if self.relay_rule_list[id][
-                                    'dist_ip'] == '0.0.0.0':
+                        else:
+                            if self.relay_rule_list[id]['user_id'] == user_id and self.relay_rule_list[id]['src_port'] == row['port']:
+                                temp_relay_rules[id] = self.relay_rule_list[id]
+                            else:
                                 continue
-
-                            temp_relay_rules[id] = self.relay_rule_list[id]
 
                     if port in ServerPool.get_instance().tcp_servers_pool:
                         ServerPool.get_instance().tcp_servers_pool[port].push_relay_rules(temp_relay_rules)
@@ -950,8 +937,7 @@ class DbTransfer(object):
                 if port in ServerPool.get_instance().tcp_servers_pool:
                     relay = ServerPool.get_instance().tcp_servers_pool[port]
                     for name in merge_config_keys:
-                        if name in cfg and not self.cmp(
-                                cfg[name], relay._config[name]):
+                        if name in cfg and not self.cmp(cfg[name], relay._config[name]):
                             cfgchange = True
                             break
                 if not cfgchange and port in ServerPool.get_instance().tcp_ipv6_servers_pool:
@@ -979,8 +965,7 @@ class DbTransfer(object):
 
         if len(new_servers) > 0:
             from shadowsocks import eventloop
-            self.event.wait(eventloop.TIMEOUT_PRECISION +
-                            eventloop.TIMEOUT_PRECISION / 2)
+            self.event.wait(eventloop.TIMEOUT_PRECISION + eventloop.TIMEOUT_PRECISION / 2)
             for port in new_servers.keys():
                 passwd, cfg = new_servers[port]
                 self.new_server(port, passwd, cfg)
@@ -988,25 +973,20 @@ class DbTransfer(object):
         ServerPool.get_instance().push_uid_port_table(self.uid_port_table)
 
     def del_server(self, port, reason):
-        logging.info(
-            'db stop server at port [%s] reason: %s!' % (port, reason))
+        logging.info('db stop server at port [%s] reason: %s!' % (port, reason))
         ServerPool.get_instance().cb_del_server(port)
         if port in self.last_update_transfer:
             del self.last_update_transfer[port]
 
         for mu_user_port in self.mu_port_list:
             if mu_user_port in ServerPool.get_instance().tcp_servers_pool:
-                ServerPool.get_instance().tcp_servers_pool[
-                    mu_user_port].reset_single_multi_user_traffic(self.port_uid_table[port])
+                ServerPool.get_instance().tcp_servers_pool[mu_user_port].reset_single_multi_user_traffic(self.port_uid_table[port])
             if mu_user_port in ServerPool.get_instance().tcp_ipv6_servers_pool:
-                ServerPool.get_instance().tcp_ipv6_servers_pool[
-                    mu_user_port].reset_single_multi_user_traffic(self.port_uid_table[port])
+                ServerPool.get_instance().tcp_ipv6_servers_pool[mu_user_port].reset_single_multi_user_traffic(self.port_uid_table[port])
             if mu_user_port in ServerPool.get_instance().udp_servers_pool:
-                ServerPool.get_instance().udp_servers_pool[
-                    mu_user_port].reset_single_multi_user_traffic(self.port_uid_table[port])
+                ServerPool.get_instance().udp_servers_pool[mu_user_port].reset_single_multi_user_traffic(self.port_uid_table[port])
             if mu_user_port in ServerPool.get_instance().udp_ipv6_servers_pool:
-                ServerPool.get_instance().udp_ipv6_servers_pool[
-                    mu_user_port].reset_single_multi_user_traffic(self.port_uid_table[port])
+                ServerPool.get_instance().udp_ipv6_servers_pool[mu_user_port].reset_single_multi_user_traffic(self.port_uid_table[port])
 
     def new_server(self, port, passwd, cfg):
         protocol = cfg.get(
@@ -1014,10 +994,8 @@ class DbTransfer(object):
             ServerPool.get_instance().config.get(
                 'protocol',
                 'origin'))
-        method = cfg.get(
-            'method', ServerPool.get_instance().config.get('method', 'None'))
-        obfs = cfg.get(
-            'obfs', ServerPool.get_instance().config.get('obfs', 'plain'))
+        method = cfg.get('method', ServerPool.get_instance().config.get('method', 'None'))
+        obfs = cfg.get('obfs', ServerPool.get_instance().config.get('obfs', 'plain'))
         logging.info(
             'db start server at port [%s] pass [%s] protocol [%s] method [%s] obfs [%s]' %
             (port, passwd, protocol, method, obfs))

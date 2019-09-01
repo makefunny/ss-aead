@@ -180,6 +180,9 @@ class TCPRelayHandler(object):
         self._relay_rules = server.relay_rules.copy()
         self._is_relay = False
         self._add_ref = 0
+        self._encryptors = {}
+        self._protocols  = {}
+        self._obfss      = {}
         if not self._create_encryptor(config):
             return
 
@@ -197,56 +200,34 @@ class TCPRelayHandler(object):
         self._overhead = self._obfs.get_overhead(self._is_local) + self._protocol.get_overhead(self._is_local)
         self._recv_buffer_size = BUF_SIZE - self._overhead
 
-        server_info = obfs.server_info(server.obfs_data)
-        server_info.host = config['server']
-        server_info.port = server._listen_port
-        #server_info.users = server.server_users
-        #server_info.update_user_func = self._update_user
-        server_info.users = {}
-        server_info.tokens = {}
-        server_info.client = self._client_address[0]
-        server_info.client_port = self._client_address[1]
-        server_info.protocol_param = ''
-        server_info.obfs_param = config['obfs_param']
+        # # print(server.obfs_data)
+        # server_info = obfs.server_info(server.obfs_data)
+        # server_info.host = config['server']
+        # server_info.port = self._server._listen_port
+        # #server_info.users = server.server_users
+        # #server_info.update_user_func = self._update_user
+        # server_info.users = {}
+        # server_info.tokens = {}
+        # server_info.client = self._client_address[0]
+        # server_info.client_port = self._client_address[1]
+        # server_info.protocol_param = ''
+        # server_info.obfs_param = config['obfs_param']
 
-        server_info.iv = self._encryptor.cipher_iv
-        server_info.recv_iv = b''
-        server_info.key_str = common.to_bytes(config['password'])
-        server_info.key = self._encryptor.key
-        server_info.head_len = 30
-        server_info.tcp_mss = self._tcp_mss
-        server_info.buffer_size = self._recv_buffer_size
-        server_info.overhead = self._overhead
-        self._obfs.set_server_info(server_info)
+        # server_info.iv = self._encryptor.cipher_iv
+        # server_info.recv_iv = b''
+        # server_info.key_str = common.to_bytes(config['password'])
+        # server_info.key = self._encryptor.key
+        # server_info.head_len = 30
+        # server_info.tcp_mss = self._tcp_mss
+        # server_info.buffer_size = self._recv_buffer_size
+        # server_info.overhead = self._overhead
+        # self._obfs.set_server_info(server_info)
+        self._obfs.set_server_info(self._set_obfs_server_info(self._encryptor, config))
         # self._obfs.set_server_info(obfs.server_info(server.obfs_data))
 
-        server_info = obfs.server_info(server.protocol_data)
-        server_info.host = config['server']
-        server_info.port = server._listen_port
-        # print(server.multi_user_host_table)
-        # print(server.multi_user_token_table)
-        server_info.users = {}
-        server_info.tokens = {}
-        if 'users_table' in config:
-            if config['protocol'] == b'auth_simple':
-                server_info.tokens = server.multi_user_token_table
-            else:
-                server_info.users  = server.multi_user_table
-        server_info.update_user_func = self._update_user
-        server_info.is_multi_user = config["is_multi_user"]
-        server_info.client = self._client_address[0]
-        server_info.client_port = self._client_address[1]
-        server_info.protocol_param = config['protocol_param']
-        server_info.obfs_param = ''
-        server_info.iv = self._encryptor.cipher_iv
-        server_info.recv_iv = b''
-        server_info.key_str = common.to_bytes(config['password'])
-        server_info.key = self._encryptor.key
-        server_info.head_len = 30
-        server_info.tcp_mss = self._tcp_mss
-        server_info.buffer_size = self._recv_buffer_size
-        server_info.overhead = self._overhead
-        self._protocol.set_server_info(server_info)
+
+        self._protocol.set_server_info(self._set_protocol_server_info(self._encryptor, config))
+        # self._protocol.set_server_info(server_info)
 
         self._redir_list = config.get('redirect', ["*#0.0.0.0:0"])
         self._is_redirect = False
@@ -285,6 +266,64 @@ class TCPRelayHandler(object):
         fd_to_handlers[self._local_sock_fd] = self
         loop.add(local_sock, eventloop.POLL_IN | eventloop.POLL_ERR, self._server)
         self._stage = STAGE_INIT
+
+    def _set_protocol_server_info(self, _encryptor, config):
+        server_info = obfs.server_info(obfs.obfs(config['protocol']).init_data())
+        server_info.host = config['server']
+        server_info.port = self._server._listen_port
+        # print(server.multi_user_host_table)
+        # print(server.multi_user_token_table)
+        server_info.users = {}
+        server_info.tokens = {}
+        if 'users_table' in config:
+            if config['protocol'] == b'auth_simple':
+                server_info.tokens = self._server.multi_user_token_table
+            else:
+                server_info.users  = self._server.multi_user_table
+        server_info.update_user_func = self._update_user
+        server_info.is_multi_user    = config["is_multi_user"]
+        server_info.client           = self._client_address[0]
+        server_info.client_port      = self._client_address[1]
+        server_info.protocol_param   = config['protocol_param']
+        server_info.obfs_param       = ''
+        server_info.iv               = _encryptor.cipher_iv
+        server_info.recv_iv = b''
+        server_info.key_str = common.to_bytes(config['password'])
+        server_info.key              = _encryptor.key
+        server_info.head_len     = 30
+        server_info.tcp_mss      = self._tcp_mss
+        server_info.buffer_size  = self._recv_buffer_size
+        server_info.overhead     = self._overhead
+        return server_info
+
+    def _set_obfs_server_info(self, _encryptor, config):
+        server_info = obfs.server_info(obfs.obfs(config['protocol']).init_data())
+        server_info.host = config['server']
+        server_info.port = self._server._listen_port
+        # print(server.multi_user_host_table)
+        # print(server.multi_user_token_table)
+        server_info.users = {}
+        server_info.tokens = {}
+        # if 'users_table' in config:
+        #     if config['protocol'] == b'auth_simple':
+        #         server_info.tokens = self._server.multi_user_token_table
+        #     else:
+        #         server_info.users  = self._server.multi_user_table
+        server_info.update_user_func = self._update_user
+        server_info.is_multi_user    = config["is_multi_user"]
+        server_info.client           = self._client_address[0]
+        server_info.client_port      = self._client_address[1]
+        server_info.protocol_param   = ''
+        server_info.obfs_param       = config['obfs_param']
+        server_info.iv               = _encryptor.cipher_iv
+        server_info.recv_iv          = b''
+        server_info.key_str          = common.to_bytes(config['password'])
+        server_info.key              = _encryptor.key
+        server_info.head_len     = 30
+        server_info.tcp_mss      = self._tcp_mss
+        server_info.buffer_size  = self._recv_buffer_size
+        server_info.overhead     = self._overhead
+        return server_info
 
     def __hash__(self):
         # default __hash__ is id / 16
@@ -599,61 +638,79 @@ class TCPRelayHandler(object):
             return ("0.0.0.0", 0)
 
     def _get_relay_host(self, client_address, ogn_data):
-        for id in self._relay_rules:
-            if self._relay_rules[id]['port'] == 0:
-                port = self._server._listen_port
-            else:
-                port = self._relay_rules[id]['dist_port']
-            return (self._relay_rules[id]['dist_ip'], int(port))
+        rule = self._get_relay_rule(client_address, ogn_data)
+        if rule:
+            return (rule['des_ip'], rule['des_port'])
         return (None, None)
 
-    def _handel_normal_relay(self, client_address, ogn_data):
-        host, port = self._get_relay_host(client_address, ogn_data)
+    def _get_relay_rule(self, client_address, ogn_data):
+        for id in self._relay_rules:
+            return self._relay_rules[id]
+        return None
+
+    def _handel_normal_relay(self, client_address, ogn_data, data):
+        # host, port = self._get_relay_host(client_address, ogn_data)
         self._encrypt_correct = False
-        if port is None:
-            raise Exception('can not parse header')
-        data = b"\x03" + common.to_bytes(common.chr(len(host))) + common.to_bytes(host) + struct.pack('>H', port)
+        # if port is None:
+        #     raise Exception('can not parse header')
         self._is_relay = True
-        return data + ogn_data
+
+        rule = self._get_relay_rule(client_address, ogn_data)
+        logging.debug('rule %s' % rule)
+        # print(rule)
+        head = b"\x03" + common.to_bytes(common.chr(len(rule['des_ip']))) + common.to_bytes(rule['des_ip']) + struct.pack('>H', rule['des_port'])
+
+        if self._current_user_id not in self._encryptors:
+            self._encryptors[self._current_user_id] = encrypt.Encryptor(rule['des_passwd'], rule['des_method'])
+            config = {}
+            config['is_multi_user'] = 0
+            config['server'] = rule['des_ip']
+            config['password'] = rule['des_passwd']
+            config['protocol'] = rule['des_protocol']
+            config['obfs']     = rule['des_obfs']
+            config['protocol_param'] = rule['des_protocol_param']
+            config['obfs_param']     = rule['des_obfs_param']
+            self._protocols[self._current_user_id]  = obfs.obfs(config['protocol'])
+            self._obfss[self._current_user_id]      = obfs.obfs(config['obfs'])
+            self._protocols[self._current_user_id].set_server_info(self._set_protocol_server_info(self._encryptors[self._current_user_id], config))
+            self._obfss[self._current_user_id].set_server_info(self._set_obfs_server_info(self._encryptors[self._current_user_id], config))
+        # logging.debug(">> \ndata     >> %s\nogn_data >> %s" % (data, ogn_data))
+
+        # logging.debug("data >> %s" % data)
+        data = self._protocols[self._current_user_id].client_pre_encrypt(data)
+        # logging.debug("data >> %s" % data)
+        data = self._encryptors[self._current_user_id].encrypt(data)
+        # logging.debug("data >> %s" % data)
+        data = self._obfss[self._current_user_id].client_encode(data)
+
+        logging.debug("data >> %s" % data)
+        return head + data
+        # return head + ogn_data
 
     def _get_mu_relay_host(self, ogn_data):
-
-        if self._current_user_id == 0:
-            return (None, None)
-
-        for id in self._relay_rules:
-            if (self._relay_rules[id]['user_id'] == 0 and self._current_user_id != 0) or self._relay_rules[id]['user_id'] == self._current_user_id:
-                has_higher_priority = False
-                for priority_id in self._relay_rules:
-                    if (
-                        (
-                            self._relay_rules[priority_id]['priority'] > self._relay_rules[id]['priority'] and self._relay_rules[id]['id'] != self._relay_rules[priority_id]['id']) or (
-                            self._relay_rules[priority_id]['priority'] == self._relay_rules[id]['priority'] and self._relay_rules[id]['id'] > self._relay_rules[priority_id]['id'])) and (
-                            self._relay_rules[priority_id]['user_id'] == self._current_user_id or self._relay_rules[priority_id]['user_id'] == 0):
-                        has_higher_priority = True
-                        continue
-
-                if has_higher_priority:
-                    continue
-
-                if self._relay_rules[id]['port'] == 0:
-                    port = self._server._listen_port
-                else:
-                    port = self._relay_rules[id]['dist_port']
-
-                return (self._relay_rules[id]['dist_ip'], int(port))
+        rule = self._get_mu_relay_rule(ogn_data)
+        if rule:
+            return (rule['des_ip'], rule['des_port'])
         return (None, None)
 
-    def _handel_mu_relay(self, client_address, ogn_data):
+    def _get_mu_relay_rule(self, ogn_data):
+        if self._current_user_id == 0:
+            return None
+        for id in self._relay_rules:
+            if self.relay_rule_list[id]['user_id'] == self._current_user_id:
+                return self._relay_rules[id]
+        return None
+
+    def _handel_mu_relay(self, client_address, ogn_data, data):
         host, port = self._get_mu_relay_host(ogn_data)
         if host is None:
             return ogn_data
         self._encrypt_correct = False
         if port is None:
             raise Exception('can not parse header')
-        data = b"\x03" + common.to_bytes(common.chr(len(host))) + common.to_bytes(host) + struct.pack('>H', port)
+        head = b"\x03" + common.to_bytes(common.chr(len(host))) + common.to_bytes(host) + struct.pack('>H', port)
         self._is_relay = True
-        return data + ogn_data
+        return head + ogn_data
 
     def _handel_protocol_error(self, client_address, ogn_data):
         if self._config['redirect_verbose']:
@@ -751,6 +808,8 @@ class TCPRelayHandler(object):
             return 4 + common.ord(buf[1])
         return def_value
 
+    # ogn 未解密的源数据
+    # data 已解密的数据
     def _handle_stage_addr(self, ogn_data, data):
         # print(ogn_data,data)
         is_error = False
@@ -791,9 +850,9 @@ class TCPRelayHandler(object):
                     is_relay = self.is_match_relay_rule_mu()
                 if self._relay_rules != {} and is_relay:
                     if self._server._config["is_multi_user"] == 0:
-                        data = self._handel_normal_relay(self._client_address, ogn_data)
+                        data = self._handel_normal_relay(self._client_address, ogn_data, data)
                     else:
-                        data = self._handel_mu_relay(self._client_address, ogn_data)
+                        data = self._handel_mu_relay(self._client_address, ogn_data, data)
                     header_result = parse_header(data)
                     if header_result is not None:
                         try:
@@ -901,7 +960,7 @@ class TCPRelayHandler(object):
                     del self._server.wrong_iplist[self._client_address[0]]
 
             self._remote_address = (common.to_str(remote_addr), remote_port)
-            self._remote_udp = (connecttype != 0)
+            self._remote_udp     = (connecttype != 0)
             # pause reading
             self._update_stream(STREAM_UP, WAIT_STATUS_WRITING)
             self._stage = STAGE_DNS
@@ -1254,12 +1313,14 @@ class TCPRelayHandler(object):
 
             is_relay = self.is_match_relay_rule_mu()
             if not is_local and (
-                (self._server._config["is_multi_user"] == 0 and self._relay_rules == {}) or (
+                (self._server._config["is_multi_user"] == 0) or (
                     self._server._config["is_multi_user"] != 0 and (
                         (self._current_user_id == 0 or is_relay == False) or self._relay_rules == {}
                     )
                 )
             ):
+                logging.debug("decrypt start")
+                logging.debug(self._is_relay)
                 if self._encryptor is not None:
                     if self._encrypt_correct:
                         # logging.info('%d raw-data %d %s' % (self._current_user_id,len(data),data))
@@ -1294,9 +1355,10 @@ class TCPRelayHandler(object):
                                 self._protocol.obfs.server_info.recv_iv = obfs_decode[0][:iv_len]
                             try:
                                 # 解密
-                                logging.debug('data len >> %d %d' % (len(data), len(obfs_decode[0])))
+                                # logging.debug('data len >> %d %d\nobfs_decode[0] >> %s' % (len(data), len(obfs_decode[0]), obfs_decode[0]))
                                 data = self._encryptor.decrypt(obfs_decode[0])
-                                logging.debug('data len >> %d' % len(data))
+                                # logging.debug('data len >> %d' % len(data))
+                                logging.debug('local_sock data >> %d %s' % (len(data),data))
                             except Exception as e:
                                 logging.error("decrypt data failed, exception from %s:%d" % (self._client_address[0], self._client_address[1]))
                                 data = [0]
@@ -1321,14 +1383,14 @@ class TCPRelayHandler(object):
                                         self._update_user(self._server.multi_user_host_table[host_name])
                                     else:
                                         logging.error(
-                                            'The host:%s md5 is mismatch,so The connection has been rejected, when connect from %s:%d via port %d' %
+                                            'The host:%s md5 is mismatch, so The connection has been rejected, when connect from %s:%d via port %d' %
                                             (host_name, self._client_address[0], self._client_address[1], self._server._listen_port)
                                         )
                                         is_Failed = True
                                 except Exception as e:
                                     # logging.error(e)
                                     logging.error(
-                                        'The mu hostname is error,so The connection has been rejected, when connect from %s:%d via port %d' %
+                                        'The mu hostname is error, so The connection has been rejected, when connect from %s:%d via port %d' %
                                         (self._client_address[0], self._client_address[1], self._server._listen_port)
                                     )
                                     is_Failed = True
@@ -1395,6 +1457,12 @@ class TCPRelayHandler(object):
 
                         if is_relay:
                             data = ogn_data
+                    else:
+                        if self._is_relay:
+                            # data = self._encryptors[self._current_user_id].encrypt(data)
+                            # data = self._encryptor.decrypt(obfs_decode[0])
+                            # logging.debug(self._encryptor.decrypt(data))
+                            pass
                 else:
                     return
                 if not data:
@@ -1404,7 +1472,10 @@ class TCPRelayHandler(object):
             if self._config['verbose']:
                 traceback.print_exc()
             self.destroy()
+        # logging.debug(">> \ndata     >> %s" % data)
+        # logging.debug(">> \ndata     >> %s\nogn_data >> %s" % (data, ogn_data))
         logging.debug("self._stage >> %d" % self._stage)
+        # stage 5
         if self._stage == STAGE_STREAM:
             logging.debug("self._is_local >> %d" % self._is_local)
             # logging.debug('self._write_to_sock >> raw data len:%d >> %s' % (len(data), data))
@@ -1416,17 +1487,64 @@ class TCPRelayHandler(object):
                     data = self._encryptor.encrypt(data)
                     data = self._obfs.client_encode(data)
 
-            # logging.debug('self._write_to_sock >> data len:%d >> %s' % (len(data), data))
-            logging.debug('self._write_to_sock >> data len:%d' % len(data))
-            self._write_to_sock(data, self._remote_sock)
+            if self._is_relay:
+                ###
+                # 来自客户端的数据 ==> relay server
+                host = ''
+                try:
+                    obfs_decode = self._obfs.server_decode(data)
+                    # print(self._server._config['obfs'], obfs_decode[1], obfs_decode[2])
+                except Exception as e:
+                    shell.print_exception(e)
+                    logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
+                    self.destroy()
+                    return
+                # need_sendback = False
+                if obfs_decode[2]:
+                    pass
+                    # host_name = ''
+                    # need_sendback = True
+                if obfs_decode[1]:
+                    if not self._protocol.obfs.server_info.recv_iv:
+                        iv_len = len(self._protocol.obfs.server_info.iv)
+                        self._protocol.obfs.server_info.recv_iv = obfs_decode[0][:iv_len]
+                    try:
+                        # 解密
+                        # logging.debug('data len >> %d %d\nobfs_decode[0] >> %s' % (len(data), len(obfs_decode[0]), obfs_decode[0]))
+                        data = self._encryptor.decrypt(obfs_decode[0])
+                        # logging.debug('data len >> %d' % len(data))
+                        # logging.debug('local_sock data >> %d %s' % (len(data),data))
+                    except Exception as e:
+                        logging.error("decrypt data failed, exception from %s:%d" % (self._client_address[0], self._client_address[1]))
+                        self.destroy()
+                        return
+                else:
+                    data = obfs_decode[0]
+                ###
+                # logging.debug('self._write_to_sock >> data len:%d >> %s' % (len(data), data))
+                # data = self._encryptor.decrypt(data)
+                logging.debug('self._write_to_sock remote >> data %d %s' % (len(data), data))
+
+                data = self._protocols[self._current_user_id].client_pre_encrypt(data)
+                data = self._encryptors[self._current_user_id].encrypt(data)
+                data = self._obfss[self._current_user_id].client_encode(data)
+                self._write_to_sock(data, self._remote_sock)
+            else:
+                # logging.debug('self._write_to_sock >> data len:%d >> %s' % (len(data), data))
+                logging.debug('self._write_to_sock remote >> data len:%d' % len(data))
+                self._write_to_sock(data, self._remote_sock)
+        # stage 0
         elif is_local and self._stage == STAGE_INIT:
             # TODO check auth method
             self._write_to_sock(b'\x05\00', self._local_sock)
             self._stage = STAGE_ADDR
+        # stage 4
         elif self._stage == STAGE_CONNECTING:
             self._handle_stage_connecting(data)
+        # stage 1 or stage 0
         elif (is_local and self._stage == STAGE_ADDR) or (not is_local and self._stage == STAGE_INIT):
-            # print(ogn_data,data)
+            # logging.debug(">> \ndata     >> %s" % data)
+            # logging.debug(">> \ndata     >> %s\nogn_data >> %s" % (data, ogn_data))
             self._handle_stage_addr(ogn_data, data)
 
     def _on_remote_read(self, is_remote_sock):
@@ -1513,6 +1631,49 @@ class TCPRelayHandler(object):
                     return
             else:
                 if self._encrypt_correct:
+                    logging.debug("_remote_sock data encrypt to send >> %d %s" % (len(data), data))
+                    data = self._protocol.server_pre_encrypt(data)
+                    data = self._encryptor.encrypt(data)
+                    data = self._obfs.server_encode(data)
+                # 中转 remote back data
+                # self._encrypt_correct = False
+                if not self._encrypt_correct and self._is_relay:
+
+                    ###
+
+                    # logging.debug("data           >> %d %s" % (len(data), data))
+                    try:
+                        obfs_decode = self._obfss[self._current_user_id].client_decode(data)
+                    except Exception as e:
+                        shell.print_exception(e)
+                        logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
+                        self.destroy()
+                        return
+                    # logging.debug("data           >> %d %s" % (len(data), data))
+                    if obfs_decode[1]:
+                        send_back = self._obfs.client_encode(b'')
+                        self._write_to_sock(send_back, self._remote_sock)
+                    if not self._protocols[self._current_user_id].obfs.server_info.recv_iv:
+                        iv_len = len(self._protocols[self._current_user_id].obfs.server_info.iv)
+                        self._protocols[self._current_user_id].obfs.server_info.recv_iv = obfs_decode[0][:iv_len]
+
+                    ###
+                    data = obfs_decode[0]
+                    logging.debug("data           >> %d %s" % (len(data), data))
+                    data = self._encryptors[self._current_user_id].decrypt(data)
+                    logging.debug("data decrypted >> %d %s" % (len(data), data))
+
+                    try:
+                        data = self._protocols[self._current_user_id].client_post_decrypt(data)
+                        if self._recv_pack_id == 1:
+                            self._tcp_mss = self._protocols[self._current_user_id].get_server_info().tcp_mss
+                    except Exception as e:
+                        shell.print_exception(e)
+                        logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
+                        self.destroy()
+                        return
+
+                    logging.debug("_remote_sock relay_data decrypted >> %d %s" % (len(data), data))
                     data = self._protocol.server_pre_encrypt(data)
                     data = self._encryptor.encrypt(data)
                     data = self._obfs.server_encode(data)
@@ -1744,8 +1905,8 @@ class TCPRelay(object):
         self.relay_rules = self._config['relay_rules'].copy()
         self.is_pushing_relay_rules = False
         if 'users_table' in self._config:
-            self.multi_user_host_table = {}
-            self.multi_user_token_table = {}
+            self.multi_user_host_table   = {}
+            self.multi_user_token_table  = {}
             self.multi_user_table = self._config['users_table']
             # print(self._config['users_table'])
             for id in self.multi_user_table:
