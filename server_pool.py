@@ -187,7 +187,7 @@ class ServerPool(object):
 
                 except Exception as e:
                     if not ipv6_ok:
-                        traceback.print_exc(e)
+                        traceback.print_exc()
                         logging.warn("IPV4 %s " % (e,))
 
         return True
