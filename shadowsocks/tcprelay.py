@@ -297,7 +297,7 @@ class TCPRelayHandler(object):
         return server_info
 
     def _set_obfs_server_info(self, _encryptor, config):
-        server_info = obfs.server_info(obfs.obfs(config['protocol']).init_data())
+        server_info = obfs.server_info(obfs.obfs(config['obfs']).init_data())
         server_info.host = config['server']
         server_info.port = self._server._listen_port
         # print(server.multi_user_host_table)
@@ -323,6 +323,7 @@ class TCPRelayHandler(object):
         server_info.tcp_mss      = self._tcp_mss
         server_info.buffer_size  = self._recv_buffer_size
         server_info.overhead     = self._overhead
+        # print(config['obfs_param'], config['obfs'])
         return server_info
 
     def __hash__(self):
