@@ -271,7 +271,7 @@ class TCPRelayHandler(object):
         server_info = obfs.server_info(obfs.obfs(config['protocol']).init_data())
         server_info.host = config['server']
         server_info.port = self._server._listen_port
-        print(config['protocol'])
+        # print(config['protocol'])
         # print(server.multi_user_host_table)
         # print(server.multi_user_token_table)
         server_info.users = {}
@@ -324,7 +324,7 @@ class TCPRelayHandler(object):
         server_info.tcp_mss      = self._tcp_mss
         server_info.buffer_size  = self._recv_buffer_size
         server_info.overhead     = self._overhead
-        # print(config['obfs_param'], config['obfs'])
+        logging.debug('obfs >> %s param >> %s' % (config['obfs'], config['obfs_param']))
         return server_info
 
     def __hash__(self):
@@ -1325,10 +1325,13 @@ class TCPRelayHandler(object):
                 logging.debug(self._is_relay)
                 if self._encryptor is not None:
                     if self._encrypt_correct:
-                        # logging.info('%d raw-data %d %s' % (self._current_user_id,len(data),data))
+                        # logging.debug('%d raw-data %d %s' % (self._current_user_id,len(data),data))
                         host = ''
                         try:
+                            # http
+                            # tls
                             obfs_decode = self._obfs.server_decode(data)
+                            # logging.debug(obfs_decode)
                             # print(self._server._config['obfs'], obfs_decode[1], obfs_decode[2])
                             if self._stage == STAGE_INIT:
                                 self._overhead = self._obfs.get_overhead(self._is_local) + self._protocol.get_overhead(self._is_local)
@@ -1357,9 +1360,9 @@ class TCPRelayHandler(object):
                                 self._protocol.obfs.server_info.recv_iv = obfs_decode[0][:iv_len]
                             try:
                                 # 解密
-                                # logging.debug('data len >> %d %d\nobfs_decode[0] >> %s' % (len(data), len(obfs_decode[0]), obfs_decode[0]))
+                                logging.debug('data len >> %d %d\nobfs_decode[0] >> %s' % (len(data), len(obfs_decode[0]), obfs_decode[0]))
                                 data = self._encryptor.decrypt(obfs_decode[0])
-                                # logging.debug('data len >> %d' % len(data))
+                                logging.debug('data len >> %d' % len(data))
                                 logging.debug('local_sock data >> %d %s' % (len(data),data))
                             except Exception as e:
                                 logging.error("decrypt data failed, exception from %s:%d" % (self._client_address[0], self._client_address[1]))
@@ -1367,9 +1370,12 @@ class TCPRelayHandler(object):
                         else:
                             data = obfs_decode[0]
 
-                        if not data:
-                            # print(self._server.multi_user_token_table)
-                            raise Exception('Error data is null')
+                        # tls 混淆时, data = obfs_decode[0] => b'', 此时不应中断
+                        # if not data:
+                        #     # print(self._server.multi_user_token_table)
+                        #     logging.error('data is None')
+                        #     self.destroy()
+                        #     return
 
                         # 混淆式 单端口多用户
                         # print(self._current_user_id,len(data),data)
@@ -1393,8 +1399,7 @@ class TCPRelayHandler(object):
                                     # logging.error(e)
                                     logging.error(
                                         'The mu hostname is error, so The connection has been rejected, when connect from %s:%d via port %d' %
-                                        (self._client_address[0], self._client_address[1], self._server._listen_port)
-                                    )
+                                        (self._client_address[0], self._client_address[1], self._server._listen_port))
                                     is_Failed = True
                             else:
                                 logging.error('host is None')
@@ -1406,7 +1411,7 @@ class TCPRelayHandler(object):
                                 self._update_user(uid)
                             elif self._server._config["protocol"] == b"auth_simple":
                                 is_Failed = True
-                                raise Exception('auth_simple is used for multi-user(type 3) only, the type is:%d'%self._server._config["is_multi_user"])
+                                raise Exception('auth_simple is used for multi-user(type 3) only, the type is:%d' % self._server._config["is_multi_user"])
                             else:
                                 data, sendback  = self._protocol.server_post_decrypt(data)
                             # logging.info('%d %d %s' % (self._current_user_id, self._stage, data))

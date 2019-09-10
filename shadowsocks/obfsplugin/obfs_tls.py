@@ -227,6 +227,8 @@ class tls_ticket_auth(plain.plain):
             if not match_begin(buf, b"\x16" + self.tls_version + b"\x00"): #Finished
                 raise Exception('server_decode data error')
             verify_len = struct.unpack('>H', buf[3:5])[0] + 1 # 11 - 10
+            # logging.debug('ok')
+            # logging.debug(len(verify), verify_len + 10)
             if len(verify) < verify_len + 10:
                 return (b'', False, False)
             if hmac.new(self.server_info.key + self.client_id, verify[:verify_len], hashlib.sha1).digest()[:10] != verify[verify_len:verify_len+10]:

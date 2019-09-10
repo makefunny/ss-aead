@@ -51,7 +51,6 @@ class obfs(object):
         method = common.to_str(method)
         self.method = method
         self._method_info = self.get_method_info(method)
-        # print(self._method_info, method)
         if self._method_info:
             self.obfs = self.get_obfs(method)
         else:

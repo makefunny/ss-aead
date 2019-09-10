@@ -570,6 +570,11 @@ class DbTransfer(object):
             d = {}
             for column in range(len(keys)):
                 d[keys[column]] = r[column]
+
+            # debug
+            # if d['id'] != 1:
+            #     continue
+
             rows.append(d)
         cur.close()
         cur = conn.cursor()
@@ -789,17 +794,17 @@ class DbTransfer(object):
                     except Exception as e:
                         logging.warning( 'encode cfg key "%s" fail, val "%s"' % (name, cfg[name]) )
 
-            logging.debug("self.node_speedlimit = %f" % self.node_speedlimit)
+            # logging.debug("self.node_speedlimit = %f" % self.node_speedlimit)
 
             if 'node_speedlimit' in cfg:
-                logging.debug("cfg['node_speedlimit'] = %f" % cfg['node_speedlimit'])
+                # logging.debug("cfg['node_speedlimit'] = %f" % cfg['node_speedlimit'])
                 
                 if float(self.node_speedlimit) > 0.0 or float(cfg['node_speedlimit']) > 0.0:
                     cfg['node_speedlimit'] = max(float(self.node_speedlimit), float(cfg['node_speedlimit']))
             else:
                 cfg['node_speedlimit'] = max(float(self.node_speedlimit), float(0.00))
 
-            logging.debug("final cfg['node_speedlimit'] = %f" % cfg['node_speedlimit'])
+            # logging.debug("final cfg['node_speedlimit'] = %f" % cfg['node_speedlimit'])
 
             if 'disconnect_ip' not in cfg:
                 cfg['disconnect_ip'] = ''
