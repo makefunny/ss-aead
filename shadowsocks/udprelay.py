@@ -492,7 +492,7 @@ class UDPRelay(object):
                     raise Exception('Error get token')
             else:
                 data, uid = self._protocol.server_udp_post_decrypt(data)
-                if uid is None：
+                if uid is None:
                     logging.info('uid is None, data >> %d' % uid)
                 else:
                     logging.info('data uid %s %d' % (data, uid))
