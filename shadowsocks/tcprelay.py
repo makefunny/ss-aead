@@ -271,6 +271,7 @@ class TCPRelayHandler(object):
         server_info = obfs.server_info(obfs.obfs(config['protocol']).init_data())
         server_info.host = config['server']
         server_info.port = self._server._listen_port
+        print(config['protocol'])
         # print(server.multi_user_host_table)
         # print(server.multi_user_token_table)
         server_info.users = {}

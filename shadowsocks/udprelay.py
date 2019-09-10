@@ -492,7 +492,10 @@ class UDPRelay(object):
                     raise Exception('Error get token')
             else:
                 data, uid = self._protocol.server_udp_post_decrypt(data)
-                logging.info('data uid %s %d', data, uid)
+                if uid is None：
+                    logging.info('uid is None, data >> %d' % uid)
+                else:
+                    logging.info('data uid %s %d' % (data, uid))
 
             if self._config['is_multi_user'] != 0 and data:
                 if uid:
