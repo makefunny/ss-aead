@@ -1369,7 +1369,7 @@ class TCPRelayHandler(object):
                                 # logging.debug('obfs_decode[0] >> %s' % obfs_decode[0])
                                 data = self._encryptor.decrypt(obfs_decode[0])
                                 # logging.debug('data decrypted len >> %d' % len(data))
-                                logging.debug('data decrypted >> %s' % data)
+                                # logging.debug('data decrypted >> %s' % data)
                             except Exception as e:
                                 logging.error("decrypt data failed, exception from %s:%d" % (self._client_address[0], self._client_address[1]))
                                 data = [0]
@@ -1546,7 +1546,7 @@ class TCPRelayHandler(object):
                 ###
                 # logging.debug('self._write_to_sock >> data len:%d >> %s' % (len(data), data))
                 # data = self._encryptor.decrypt(data)
-                logging.debug('self._write_to_sock remote >> data %d %s' % (len(data), data))
+                # logging.debug('self._write_to_sock remote >> data %d %s' % (len(data), data))
 
                 data = self._protocols[self._current_user_id].client_pre_encrypt(data)
                 data = self._encryptors[self._current_user_id].encrypt(data)
