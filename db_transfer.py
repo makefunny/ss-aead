@@ -16,6 +16,7 @@ import datetime
 import fcntl
 from copy import copy
 
+import constants
 
 switchrule = None
 db_instance = None
@@ -101,7 +102,7 @@ class DbTransfer(object):
                 continue
 
             if self.uid_productid_table[self.port_uid_table[id]] == -1:
-                print('self.uid_productid_table[self.port_uid_table[id]] == -1')
+                logging.debug('self.uid_productid_table[self.port_uid_table[id]] == -1')
                 continue
 
             query_sub_when += ' WHEN %s THEN traffic_flow_used_up+%s' % (
@@ -229,23 +230,18 @@ class DbTransfer(object):
                         cur = conn.cursor()
                         cur.execute(
                             "INSERT INTO `blockip` (`id`, `nodeid`, `ip`, `datetime`) VALUES (NULL, '" +
-                            str(
-                                get_config().NODE_ID) +
+                            str(get_config().NODE_ID) +
                             "', '" +
                             str(realip) +
                             "', unix_timestamp())")
                         cur.close()
                     else:
                         if not is_ipv6:
-                            os.system('route add -host %s gw 127.0.0.1' %
-                                      str(realip))
+                            os.system('route add -host %s gw 127.0.0.1' % str(realip))
                             deny_str = deny_str + "\nALL: " + str(realip)
                         else:
-                            os.system(
-                                'ip -6 route add ::1/128 via %s/128' %
-                                str(realip))
-                            deny_str = deny_str + \
-                                "\nALL: [" + str(realip) + "]/128"
+                            os.system('ip -6 route add ::1/128 via %s/128' % str(realip))
+                            deny_str = deny_str + "\nALL: [" + str(realip) + "]/128"
 
                         logging.info("Local Block ip:" + str(realip))
                 if get_config().CLOUDSAFE == 0:
@@ -397,7 +393,7 @@ class DbTransfer(object):
             exist_id_list.append(id)
             # add new rule
             if id not in self.detect_text_list_dns:
-                print('[if id not in self.detect_text_list_dns] add new rule')
+                logging.debug('[if id not in self.detect_text_list_dns] add new rule')
                 d = {}
                 d['id'] = id
                 d['regex'] = str(r[1])
@@ -407,7 +403,7 @@ class DbTransfer(object):
             else:
                 # change rule exist
                 if r[1] != self.detect_text_list_dns[id]['regex']:
-                    print("[if r[1] != self.detect_text_list_dns[id]['regex']]  edit this rule")
+                    logging.debug("[if r[1] != self.detect_text_list_dns[id]['regex']]  edit this rule")
                     del self.detect_text_list_dns[id]
                     d = {}
                     d['id'] = id
@@ -423,7 +419,7 @@ class DbTransfer(object):
                 self.detect_text_dns_ischanged = True
 
         for id in deleted_id_list:
-            print('del self.detect_text_list_dns[id]')
+            logging.debug('del self.detect_text_list_dns[id]')
             del self.detect_text_list_dns[id]
 
         cur.close()
@@ -510,7 +506,7 @@ class DbTransfer(object):
             cur.close()
             conn.commit()
             conn.close()
-            print('nodeinfo is None:')
+            logging.debug('nodeinfo is None:')
             return rows
 
         # print(nodeinfo)
@@ -709,24 +705,32 @@ class DbTransfer(object):
 
         # 单端口多用户
         for row in rows:
-            if row['is_multi_user'] != 0:
+            if row['is_multi_user'] != constants.is_multi_user_NOT_MULTI:
                 self.mu_port_list.append(int(row['port']))
                 continue
-
-            # if row['id'] == 1:
-            #     print(row['id'])
 
             md5_users[row['id']] = row.copy()
             del md5_users[row['id']]['u']
             del md5_users[row['id']]['d']
+
             if md5_users[row['id']]['disconnect_ip']  is None:
                 md5_users[row['id']]['disconnect_ip'] = ''
-
             if md5_users[row['id']]['forbidden_ip']  is None:
                 md5_users[row['id']]['forbidden_ip'] = ''
-
             if md5_users[row['id']]['forbidden_port']  is None:
                 md5_users[row['id']]['forbidden_port'] = ''
+
+            # if row['id'] == 1:
+            #     # print(row['id'])
+            #     print(md5_users[row['id']])
+
+            # multi_user param is generated but not provided by database
+            # and the param will influence the data auth, don't know the reason yet
+            if len(md5_users[row['id']]['obfs_param']) > 0:
+                md5_users[row['id']]['obfs_param'] = ""
+            if len(md5_users[row['id']]['protocol_param']) > 0:
+                md5_users[row['id']]['protocol_param'] = ""
+
             md5_users[row['id']]['token'] = row['passwd']
             md5_users[row['id']]['md5'] = common.get_md5(str(row['id']) + row['passwd'] + row['method'] + row['obfs'] + row['protocol'])
 
@@ -741,7 +745,7 @@ class DbTransfer(object):
         if self.mu_only == 1:
             i = 0
             while i < len(rows):
-                if rows[i]['is_multi_user'] == 0:
+                if rows[i]['is_multi_user'] == constants.is_multi_user_NOT_MULTI:
                     rows.pop(i)
                     i -= 1
                 else:
@@ -792,13 +796,11 @@ class DbTransfer(object):
                     try:
                         cfg[name] = cfg[name].encode('utf-8')
                     except Exception as e:
-                        logging.warning( 'encode cfg key "%s" fail, val "%s"' % (name, cfg[name]) )
+                        logging.warning( 'encode cfg key "%s" fail, val "%s"' % (name, cfg[name]))
 
             # logging.debug("self.node_speedlimit = %f" % self.node_speedlimit)
-
             if 'node_speedlimit' in cfg:
                 # logging.debug("cfg['node_speedlimit'] = %f" % cfg['node_speedlimit'])
-                
                 if float(self.node_speedlimit) > 0.0 or float(cfg['node_speedlimit']) > 0.0:
                     cfg['node_speedlimit'] = max(float(self.node_speedlimit), float(cfg['node_speedlimit']))
             else:
@@ -822,18 +824,17 @@ class DbTransfer(object):
                 cfg['obfs_param'] = ''
 
             if 'is_multi_user' not in cfg:
-                cfg['is_multi_user'] = 0
+                cfg['is_multi_user'] = constants.is_multi_user_NOT_MULTI
 
             if port not in cur_servers:
                 cur_servers[port] = passwd
             else:
                 # print(len(cur_servers),cur_servers)
                 logging.error(
-                    'more than one user use the same port [%s] or there is an another process bind at this port' % (port,)
-                )
+                    'more than one user use the same port [%s] or there is an another process bind at this port' % (port,))
                 continue
 
-            if cfg['is_multi_user'] != 0:
+            if cfg['is_multi_user'] != constants.is_multi_user_NOT_MULTI:
                 cfg['users_table'] = md5_users.copy()
 
             cfg['detect_text_list_all'] = self.detect_text_list_all.copy()
@@ -841,10 +842,10 @@ class DbTransfer(object):
             cfg['detect_text_list_dns'] = self.detect_text_list_dns.copy()
             cfg['detect_hex_list_dns'] = self.detect_hex_list_dns.copy()
 
-            if self.is_relay and row['is_multi_user'] != 2:
+            if self.is_relay and row['is_multi_user'] != constants.is_multi_user_PROTOCOL:
                 temp_relay_rules = {}
                 for id in self.relay_rule_list:
-                    if cfg['is_multi_user'] != 0:
+                    if cfg['is_multi_user'] != constants.is_multi_user_NOT_MULTI:
                         if self.relay_rule_list[id]['src_port'] == row['port']:
                             temp_relay_rules[id] = self.relay_rule_list[id]
                         else:
@@ -865,10 +866,10 @@ class DbTransfer(object):
                 # xun-huan zai-ru gui-ze, you xin-gui-ze shi, ze hui tong-guo xun-huan de-dao geng-xin
                 cfgchange = False
                 if self.detect_text_all_ischanged or self.detect_hex_all_ischanged:
-                    print('[if self.detect_text_all_ischanged or self.detect_hex_all_ischanged] cfgchange = True')
+                    logging.info('[if self.detect_text_all_ischanged or self.detect_hex_all_ischanged] cfgchange = True')
                     cfgchange = True
                 if self.detect_text_dns_ischanged or self.detect_hex_dns_ischanged:
-                    print('[if self.detect_text_dns_ischanged or self.detect_hex_dns_ischanged] cfgchange = True')
+                    logging.info('[if self.detect_text_dns_ischanged or self.detect_hex_dns_ischanged] cfgchange = True')
                     if not cfgchange:
                         cfgchange = True
 
@@ -894,7 +895,7 @@ class DbTransfer(object):
                     ServerPool.get_instance().udp_ipv6_servers_pool[port].modify_detect_text_list(self.detect_text_list_all)
                     ServerPool.get_instance().udp_ipv6_servers_pool[port].modify_detect_hex_list(self.detect_hex_list_all)
 
-                if row['is_multi_user'] != 0:
+                if row['is_multi_user'] != constants.is_multi_user_NOT_MULTI:
                     if port in ServerPool.get_instance().tcp_servers_pool:
                         ServerPool.get_instance().tcp_servers_pool[port].modify_multi_user_table(md5_users)
                     if port in ServerPool.get_instance().tcp_ipv6_servers_pool:
@@ -904,10 +905,10 @@ class DbTransfer(object):
                     if port in ServerPool.get_instance().udp_ipv6_servers_pool:
                         ServerPool.get_instance().udp_ipv6_servers_pool[port].modify_multi_user_table(md5_users)
 
-                if self.is_relay and row['is_multi_user'] != 2:
+                if self.is_relay and row['is_multi_user'] != constants.is_multi_user_PROTOCOL:
                     temp_relay_rules = {}
                     for id in self.relay_rule_list:
-                        if cfg['is_multi_user'] != 0:
+                        if cfg['is_multi_user'] != constants.is_multi_user_NOT_MULTI:
                             if self.relay_rule_list[id]['src_port'] == row['port']:
                                 temp_relay_rules[id] = self.relay_rule_list[id]
                             else:

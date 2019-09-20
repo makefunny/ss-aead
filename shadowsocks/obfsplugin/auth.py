@@ -1095,10 +1095,12 @@ class auth_aes128_sha1(auth_base):
         sendback = False
 
         if not self.has_recv_header:
+            # print("not self.has_recv_header", len(self.recv_buf), len(buf))
             if len(self.recv_buf) >= 7 or len(self.recv_buf) in [2, 3]:
                 recv_len = min(len(self.recv_buf), 7)
                 mac_key = self.server_info.recv_iv + self.server_info.key
                 sha1data = hmac.new(mac_key, self.recv_buf[:1], self.hashfunc).digest()[:recv_len - 1]
+                # print(sha1data, self.recv_buf[1:recv_len])
                 if sha1data != self.recv_buf[1:recv_len]:
                     return self.not_match_return(self.recv_buf)
 
@@ -1111,20 +1113,30 @@ class auth_aes128_sha1(auth_base):
                     return (b'', False)
                 return self.not_match_return(self.recv_buf)
 
+            # print(self.recv_buf, buf)
             uid = struct.unpack('<I', buf[7:11])[0]
+            # print(uid, self.server_info.users)
+            # for user_id in self.server_info.users:
+            #     print(user_id)
             if uid in self.server_info.users:
+                # print('get uid')
+                # print(uid, self.server_info.users[uid])
                 self.user_id = uid
                 self.user_key = self.hashfunc(self.server_info.users[uid]['passwd'].encode('utf-8')).digest()
                 self.server_info.update_user_func(uid)
             else:
+                # print('uid not found')
                 if self.server_info.is_multi_user != 2:
                     self.user_key = self.server_info.key
                 else:
                     self.user_key = self.server_info.recv_iv
+            # print(uid, self.server_info.users[uid], self.user_key, self.salt)
             encryptor = encrypt.Encryptor(to_bytes(base64.b64encode(self.user_key)) + self.salt, 'aes-128-cbc')
             head = encryptor.decrypt(b'\x00' * 16 + self.recv_buf[11:27] + b'\x00') # need an extra byte or recv empty
+            # print(head)
             length = struct.unpack('<H', head[12:14])[0]
             if len(self.recv_buf) < length:
+                # print("len(self.recv_buf) %d < length %d" % (len(self.recv_buf), length))
                 return (b'', False)
 
             utc_time = struct.unpack('<I', head[:4])[0]
