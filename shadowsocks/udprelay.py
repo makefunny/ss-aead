@@ -493,9 +493,11 @@ class UDPRelay(object):
             else:
                 data, uid = self._protocol.server_udp_post_decrypt(data)
                 if uid is None:
-                    logging.debug('uid is None, data >> %d' % uid)
+                    pass
+                    # logging.debug('uid is None, data >> %d' % data)
                 else:
-                    logging.debug('data uid %s %d' % (data, uid))
+                    pass
+                    # logging.debug('data %s uid %d' % (data, uid))
 
             if self._config['is_multi_user'] != 0 and data:
                 if uid:
