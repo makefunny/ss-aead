@@ -494,7 +494,8 @@ class TCPRelayHandler(object):
                     logging.debug("data sent:%d" % s)
                     if s < l:
                         data = data[s:]
-                        logging.debug("uncomplete data:%d %s" % (len(data), data))
+                        logging.debug("uncomplete data:%d" % len(data))
+                        # logging.debug("uncomplete data:%d %s" % (len(data), data))
                         uncomplete = True
                 else:
                     return
