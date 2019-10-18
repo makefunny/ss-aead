@@ -88,9 +88,11 @@ class Encryptor(object):
         self.method = method
         self.iv_sent = False
         self.cipher_iv = b''
+        self.iv_buf = b'' # ssrspeed
         self.decipher = None
         self.decipher_iv = None
         self.crypto_path = crypto_path
+        logging.debug(self.crypto_path)
         method = method.lower()
         self._method_info = Encryptor.get_method_info(method)
         if self._method_info:
@@ -100,7 +102,10 @@ class Encryptor(object):
                     random_string(self._method_info[METHOD_INFO_IV_LEN])
                 )
             else:
-                self.cipher = self.get_cipher(key, method, 1, iv)
+                if self.key:
+                    self.cipher = self.get_cipher(self.key, method, 1, iv)
+                else:
+                    self.cipher = self.get_cipher(self.password, method, 1, iv)
         else:
             logging.error('method %s not supported' % method)
             # sys.exit(1)
@@ -134,12 +139,35 @@ class Encryptor(object):
         if len(buf) == 0:
             return buf
         if self.iv_sent:
+            # return self.cipher.encrypt(buf)
             return self.cipher.encrypt(buf)
         else:
             self.iv_sent = True
+            # return self.cipher_iv + self.cipher.encrypt(buf)
             return self.cipher_iv + self.cipher.encrypt(buf)
 
     def decrypt(self, buf):
+        logging.debug("decrypt >> %d %s %s" % (len(buf),self.password, self.method))
+        if len(buf) == 0:
+            return buf
+
+        if self.decipher is not None: #optimize
+            return self.decipher.update(buf)
+
+        decipher_iv_len = self._method_info[1]
+        if len(self.iv_buf) <= decipher_iv_len:
+            self.iv_buf += buf
+        if len(self.iv_buf) > decipher_iv_len:
+            decipher_iv = self.iv_buf[:decipher_iv_len]
+            self.decipher = self.get_cipher(self.password, self.method, CIPHER_ENC_DECRYPTION,
+                                            iv=decipher_iv)
+            buf = self.iv_buf[decipher_iv_len:]
+            del self.iv_buf
+            return self.decipher.update(buf)
+        else:
+            return b''
+
+    def decrypt_origin(self, buf):
         # print(self.password)
         if len(buf) == 0:
             return buf

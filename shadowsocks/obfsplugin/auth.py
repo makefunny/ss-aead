@@ -705,6 +705,7 @@ class auth_sha1_v4(auth_base):
         ret = b''
         if not self.has_sent_header:
             head_size = self.get_head_size(buf, 30)
+            logging.debug("head_size >> %d" % head_size)
             datalen = min(len(buf), random.randint(0, 31) + head_size)
             ret += self.pack_auth_data(self.auth_data() + buf[:datalen])
             buf = buf[datalen:]
@@ -987,22 +988,33 @@ class auth_aes128_sha1(auth_base):
             rnd_len = struct.unpack('<H', os.urandom(2))[0] % 512
         else:
             rnd_len = struct.unpack('<H', os.urandom(2))[0] % 1024
+        # why 
+        logging.debug("rnd_len  >> %d %s" % (rnd_len,  struct.pack('<H', rnd_len) ))
         data = auth_data
         data_len = 7 + 4 + 16 + 4 + len(buf) + rnd_len + 4
+        logging.debug("data_len >> %d %s" % (data_len, struct.pack('<H', data_len)))
         data = data + struct.pack('<H', data_len) + struct.pack('<H', rnd_len)
+        logging.debug("head >> %d %s" % (len(data), data))
+        logging.debug("buf  >> %s" % buf)
         mac_key = self.server_info.iv + self.server_info.key
         uid = os.urandom(4)
         if b':' in to_bytes(self.server_info.protocol_param):
             try:
                 items = to_bytes(self.server_info.protocol_param).split(b':')
                 self.user_key = self.hashfunc(items[1]).digest()
+                logging.debug("self.user_key >> %s" % self.user_key)
                 uid = struct.pack('<I', int(items[0]))
             except:
                 pass
         if self.user_key is None:
             self.user_key = self.server_info.key
-        encryptor = encrypt.Encryptor(to_bytes(base64.b64encode(self.user_key)) + self.salt, 'aes-128-cbc', b'\x00' * 16)
-        data = uid + encryptor.encrypt(data)[16:]
+        logging.debug("self.user_key >> %s" % self.user_key)
+        logging.debug("self.salt     >> %s" % self.salt)
+        encryptor = encrypt.Encryptor(to_bytes(base64.b64encode(self.user_key)) + self.salt, 'aes-128-cbc', iv = b'\x00' * 16)
+        temp = encryptor.encrypt(data)[16:]
+        logging.debug("data after uid raw >> %s" % data)
+        logging.debug("data after uid     >> %s" % temp)
+        data = uid + temp
         data += hmac.new(mac_key, data, self.hashfunc).digest()[:4]
         check_head = os.urandom(1)
         check_head += hmac.new(mac_key, check_head, self.hashfunc).digest()[:6]
@@ -1030,9 +1042,13 @@ class auth_aes128_sha1(auth_base):
         ogn_data_len = len(buf)
         if not self.has_sent_header:
             head_size = self.get_head_size(buf, 30)
-            datalen = min(len(buf), random.randint(0, 31) + head_size)
+            logging.debug("head_size >> %d" % head_size)
+            # datalen = min(len(buf), random.randint(0, 31) + head_size)
+            datalen = min(len(buf), 1200)
             ret += self.pack_auth_data(self.auth_data(), buf[:datalen])
+            logging.debug("buf >> %s" % buf)
             buf = buf[datalen:]
+            logging.debug("buf >> %s" % buf)
             self.has_sent_header = True
         while len(buf) > self.unit_len:
             ret += self.pack_data(buf[:self.unit_len], ogn_data_len)
@@ -1094,8 +1110,10 @@ class auth_aes128_sha1(auth_base):
         out_buf = b''
         sendback = False
 
+        logging.debug("buf >> %d" % len(buf))
+        logging.debug("self.recv_buf >> %d %s" % (len(self.recv_buf), self.recv_buf))
+        logging.debug("self.has_recv_header >> %d" % self.has_recv_header)
         if not self.has_recv_header:
-            # print("not self.has_recv_header", len(self.recv_buf), len(buf))
             if len(self.recv_buf) >= 7 or len(self.recv_buf) in [2, 3]:
                 recv_len = min(len(self.recv_buf), 7)
                 mac_key = self.server_info.recv_iv + self.server_info.key
@@ -1106,6 +1124,7 @@ class auth_aes128_sha1(auth_base):
 
             if len(self.recv_buf) < 31:
                 return (b'', False)
+
             sha1data = hmac.new(mac_key, self.recv_buf[7:27], self.hashfunc).digest()[:4]
             if sha1data != self.recv_buf[27:31]:
                 logging.error('%s data uncorrect auth HMAC-SHA1 from %s:%d, data %s' % (self.no_compatible_method, self.server_info.client, self.server_info.client_port, binascii.hexlify(self.recv_buf)))
@@ -1113,30 +1132,30 @@ class auth_aes128_sha1(auth_base):
                     return (b'', False)
                 return self.not_match_return(self.recv_buf)
 
-            # print(self.recv_buf, buf)
-            uid = struct.unpack('<I', buf[7:11])[0]
-            # print(uid, self.server_info.users)
-            # for user_id in self.server_info.users:
-            #     print(user_id)
+            # uid = struct.unpack('<I', buf[7:11])[0]
+            uid = struct.unpack('<I', self.recv_buf[7:11])[0]
+            logging.debug("uid >> %d" % uid)
+            # logging.debug(self.server_info.users)
             if uid in self.server_info.users:
-                # print('get uid')
-                # print(uid, self.server_info.users[uid])
                 self.user_id = uid
                 self.user_key = self.hashfunc(self.server_info.users[uid]['passwd'].encode('utf-8')).digest()
                 self.server_info.update_user_func(uid)
             else:
-                # print('uid not found')
+                logging.debug("uid not found")
                 if self.server_info.is_multi_user != 2:
                     self.user_key = self.server_info.key
                 else:
                     self.user_key = self.server_info.recv_iv
-            # print(uid, self.server_info.users[uid], self.user_key, self.salt)
+            logging.debug("self.user_key >> %s" % self.user_key)
+            logging.debug("self.salt     >> %s" % self.salt)
             encryptor = encrypt.Encryptor(to_bytes(base64.b64encode(self.user_key)) + self.salt, 'aes-128-cbc')
             head = encryptor.decrypt(b'\x00' * 16 + self.recv_buf[11:27] + b'\x00') # need an extra byte or recv empty
-            # print(head)
+            # head 是什么
+            logging.debug("head raw      >> %s" % self.recv_buf[11:27])
+            logging.debug("head          >> %s" % head)
             length = struct.unpack('<H', head[12:14])[0]
+            logging.debug("length        >> %d" % length)
             if len(self.recv_buf) < length:
-                # print("len(self.recv_buf) %d < length %d" % (len(self.recv_buf), length))
                 return (b'', False)
 
             utc_time = struct.unpack('<I', head[:4])[0]

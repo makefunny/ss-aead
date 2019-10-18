@@ -31,7 +31,9 @@ from configloader import load_config, get_config
 from shadowsocks import lru_cache
 
 def compat_ord(s):
-    if isinstance(s, int):
+    # if isinstance(s, int):
+    #     return s
+    if type(s) == int:
         return s
     return _ord(s)
 
@@ -52,14 +54,18 @@ connect_log = logging.debug
 
 def to_bytes(s):
     if bytes != str:
-        if isinstance(s, str):
+        # if isinstance(s, str):
+        #     return s.encode('utf-8')
+        if type(s) == str:
             return s.encode('utf-8')
     return s
 
 
 def to_str(s):
     if bytes != str:
-        if isinstance(s, bytes):
+        # if isinstance(s, bytes):
+        #     return s.decode('utf-8')
+        if type(s) == bytes:
             return s.decode('utf-8')
     return s
 

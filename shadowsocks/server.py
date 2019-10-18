@@ -98,15 +98,6 @@ def main():
         else:
             password = password_obfs
 
-        config['relay_rules'] = {}
-        config['detect_hex_list_all'] = {}
-        config['detect_text_list_all'] = {}
-        config['detect_hex_list_dns'] = {}
-        config['detect_text_list_dns'] = {}
-        config["is_multi_user"] = 0
-
-        # print(config)
-
         a_config = config.copy()
                 
         ipv6_ok = False
@@ -119,15 +110,23 @@ def main():
                         0] == "[" and a_config['server_ipv6'][-1] == "]":
                     a_config['server_ipv6'] = a_config['server_ipv6'][1:-1]
                 a_config['server_port'] = int(port)
-                a_config['password'] = password
-                a_config['method'] = method
-                a_config['protocol'] = protocol
+                a_config['password']    = password
+                a_config['method']      = method
+                a_config['protocol']    = protocol
                 a_config['protocol_param'] = protocol_param
-                a_config['obfs'] = obfs
-                a_config['obfs_param'] = obfs_param
-                a_config['out_bind'] = bind
-                a_config['out_bindv6'] = bindv6
-                a_config['server'] = a_config['server_ipv6']
+                a_config['obfs']        = obfs
+                a_config['obfs_param']  = obfs_param
+                a_config['out_bind']    = bind
+                a_config['out_bindv6']  = bindv6
+                a_config['server']      = a_config['server_ipv6']
+
+                a_config['relay_rules']             = {}
+                a_config['detect_hex_list_all']     = {}
+                a_config['detect_text_list_all']    = {}
+                a_config['detect_hex_list_dns']     = {}
+                a_config['detect_text_list_dns']    = {}
+                a_config["is_multi_user"]           = 0
+
                 logging.info("starting server at [%s]:%d" %
                              (a_config['server'], int(port)))
                 tcp_servers.append(
@@ -158,8 +157,15 @@ def main():
             a_config['obfs_param'] = obfs_param
             a_config['out_bind'] = bind
             a_config['out_bindv6'] = bindv6
-            logging.info("starting server at %s:%d" %
-                         (a_config['server'], int(port)))
+
+            a_config['relay_rules'] = {}
+            a_config['detect_hex_list_all'] = {}
+            a_config['detect_text_list_all'] = {}
+            a_config['detect_hex_list_dns'] = {}
+            a_config['detect_text_list_dns'] = {}
+            a_config["is_multi_user"] = 0
+
+            logging.info("starting server at %s:%d" % (a_config['server'], int(port)))
             tcp_servers.append(
                 tcprelay.TCPRelay(
                     a_config,

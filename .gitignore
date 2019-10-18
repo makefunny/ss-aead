@@ -42,3 +42,5 @@ htmlcov
 
 dns.log
 log
+
+logs/*

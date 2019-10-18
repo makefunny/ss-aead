@@ -471,7 +471,6 @@ class DbTransfer(object):
     def pull_db_all_user(self):
         import cymysql
         # 数据库所有用户信息
-
         if get_config().PORT_GROUP == 0:
             try:
                 switchrule = importloader.load('switchrule')
@@ -488,6 +487,8 @@ class DbTransfer(object):
             switchrule = importloader.load('switchrule')
             keys, user_method_keys = switchrule.getPortGroupKeys()['user'], switchrule.getPortGroupKeys()['user_method']
             mu_keys=copy(keys)
+        else:
+            raise Exception("Unknown port_group type %d" % get_config().PORT_GROUP)
 
         if get_config().ENABLE_DNSLOG == 0:
             self.enable_dnsLog = False
@@ -509,7 +510,7 @@ class DbTransfer(object):
             logging.debug('nodeinfo is None:')
             return rows
 
-        # print(nodeinfo)
+        logging.debug(nodeinfo)
         cur.close()
 
         self.node_speedlimit = float(nodeinfo[2])
@@ -547,7 +548,7 @@ class DbTransfer(object):
             #     node_group_sql = "AND a.`node_group`=" + str(nodeinfo[0])
             import port_range
             port_mysql_str = port_range.getPortRangeMysqlStrForPortGroup()
-            # print(port_mysql_str)
+            # logging.debug(port_mysql_str)
             cur = conn.cursor()
             execute_str = "SELECT a.`" + '`,a.`'.join(keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
                 "`,c.traffic_flow as transfer_enable,c.traffic_flow_used_up as u,c.traffic_flow_used_dl as d,c.id as productid" + \
@@ -557,7 +558,7 @@ class DbTransfer(object):
                 "AND a.`id`=c.`user_id` AND c.`status`=2 AND (c.`expire_time`=-1 OR c.`expire_time`>unix_timestamp()) AND (c.`traffic_flow`>c.`traffic_flow_used_up`+c.`traffic_flow_used_dl` OR c.`traffic_flow`=-1) AND c.`node_group`=" + str(nodeinfo[0]) + \
                 port_mysql_str
             cur.execute(execute_str)
-            # print(execute_str)
+            # logging.debug(execute_str)
             keys += user_method_keys
         # 按顺序来
         keys += ['transfer_enable', 'u', 'd', 'productid']
@@ -574,6 +575,7 @@ class DbTransfer(object):
             rows.append(d)
         cur.close()
         cur = conn.cursor()
+        # logging.debug(len(rows))
         # print(rows)
         # print('keys', keys)
         # print('mu_keys', mu_keys)
@@ -591,6 +593,7 @@ class DbTransfer(object):
         execute_str =   "SELECT b.`" + '`,b.`'.join(mu_port_keys) + "`,a.`port_diff`,a.`type`" + \
                         " FROM mu_node a,mu_port b" + \
                         " WHERE a.`node_id`='" + str(get_config().NODE_ID) + "' AND a.`mu_port_id`=b.`id` AND a.`enable`=1 AND b.`enable`=1"
+        # logging.debug(execute_str)
         cur.execute(execute_str)
         temp = 0
         mu_port_keys += ['port_diff','type']
@@ -610,7 +613,7 @@ class DbTransfer(object):
             d['is_multi_user'] = temp_d['type']
             d['disconnect_ip'] = None
             d['forbidden_ip'] = ''
-            # print('d',d)
+            # logging.debug(d)
             rows.append(d)
             # execute_str = "SELECT a.`" + '`,a.`'.join(mu_keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
             #         "` FROM user a,user_method b" + \
@@ -655,8 +658,8 @@ class DbTransfer(object):
                         + ',a.'.join(keys_relay) + ", c.`port`, b." \
                         + ',b.'.join(keys_user_method) \
                         + " FROM relay a,user_method b,user_method c WHERE a.`src_node_id` = " + str(get_config().NODE_ID) \
-                        + " AND a.`des_user_method_id` = b.`id` AND a.`src_user_method_id` = c.`id` AND a.`is_user_method_same` = 0"
-            # print(execute_str)
+                        + " AND a.`des_user_method_id` = b.`id` AND a.`src_user_method_id` = c.`id` AND a.`is_user_method_same` = 0 AND a.`enable` = 1"
+            # logging.debug(execute_str)
             cur.execute(execute_str)
 
             for r in cur.fetchall():
@@ -734,8 +737,8 @@ class DbTransfer(object):
             md5_users[row['id']]['token'] = row['passwd']
             md5_users[row['id']]['md5'] = common.get_md5(str(row['id']) + row['passwd'] + row['method'] + row['obfs'] + row['protocol'])
 
-        # print(self.mu_port_list)
-        # print(md5_users)
+        # logging.debug(self.mu_port_list)
+        # logging.debug(md5_users)
 
         for row in rows:
             self.port_uid_table[row['port']]    = row['id']
@@ -842,10 +845,13 @@ class DbTransfer(object):
             cfg['detect_text_list_dns'] = self.detect_text_list_dns.copy()
             cfg['detect_hex_list_dns'] = self.detect_hex_list_dns.copy()
 
-            if self.is_relay and row['is_multi_user'] != constants.is_multi_user_PROTOCOL:
+            # logging.debug(self.relay_rule_list)
+            # logging.debug(self.is_relay)
+            if self.is_relay:
                 temp_relay_rules = {}
                 for id in self.relay_rule_list:
                     if cfg['is_multi_user'] != constants.is_multi_user_NOT_MULTI:
+                        # 单端口需要推送每个中转规则
                         if self.relay_rule_list[id]['src_port'] == row['port']:
                             temp_relay_rules[id] = self.relay_rule_list[id]
                         else:
@@ -905,7 +911,7 @@ class DbTransfer(object):
                     if port in ServerPool.get_instance().udp_ipv6_servers_pool:
                         ServerPool.get_instance().udp_ipv6_servers_pool[port].modify_multi_user_table(md5_users)
 
-                if self.is_relay and row['is_multi_user'] != constants.is_multi_user_PROTOCOL:
+                if self.is_relay:
                     temp_relay_rules = {}
                     for id in self.relay_rule_list:
                         if cfg['is_multi_user'] != constants.is_multi_user_NOT_MULTI:

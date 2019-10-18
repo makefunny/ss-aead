@@ -362,7 +362,7 @@ class auth_chain_a(auth_base):
         if self.user_key is None:
             self.user_key = self.server_info.key
 
-        encryptor = encrypt.Encryptor(to_bytes(base64.b64encode(self.user_key)) + self.salt, 'aes-128-cbc', b'\x00' * 16)
+        encryptor = encrypt.Encryptor(to_bytes(base64.b64encode(self.user_key)) + self.salt, 'aes-128-cbc', iv = b'\x00' * 16)
 
         uid = struct.unpack('<I', uid)[0] ^ struct.unpack('<I', self.last_client_hash[8:12])[0]
         uid = struct.pack('<I', uid)
