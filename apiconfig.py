@@ -1,7 +1,7 @@
 ﻿# Config
 NODE_ID = nodeid
 
-# net upload download log and the unit is minute
+# is blocked
 NETTEST = 0
 
 # ipv6
