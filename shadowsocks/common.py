@@ -25,10 +25,10 @@ import binascii
 import re
 import hashlib
 import random
+
 from configloader import load_config, get_config
-
-
 from shadowsocks import lru_cache
+
 
 def compat_ord(s):
     # if isinstance(s, int):
@@ -36,7 +36,6 @@ def compat_ord(s):
     if type(s) == int:
         return s
     return _ord(s)
-
 
 def compat_chr(d):
     if bytes == str:

@@ -150,10 +150,10 @@ class simple_obfs_http(plain.plain):
             return (b'', True, False)
 
         if b'\r\n\r\n' in buf:
-            if b'Upgrade: websocket' not in buf:
-                self.recv_buffer = None
-                logging.debug('simple_obfs_http: protocol error')
-                return self.not_match_return(buf)
+            # if b'Upgrade: websocket' not in buf:
+            #     self.recv_buffer = None
+            #     logging.warn('simple_obfs_http: protocol error')
+            #     return self.not_match_return(buf)
             datas = buf.split(b'\r\n\r\n', 1)
             host = self.get_host_from_http_header(buf)
             if host and self.server_info.obfs_param:

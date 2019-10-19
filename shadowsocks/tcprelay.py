@@ -29,6 +29,7 @@ import random
 import platform
 import threading
 import os
+import inspect
 
 from shadowsocks import encrypt, obfs, eventloop, shell, common
 from shadowsocks.common import pre_parse_header, parse_header, IPNetwork, PortRange
@@ -366,10 +367,11 @@ class TCPRelayHandler(object):
             return True
         except Exception:
             self._stage = STAGE_DESTROYED
-            logging.error('create encryptor fail at port %d', self._server._listen_port)
+            logging.error('create encryptor failed at port %d', self._server._listen_port)
             traceback.print_exc()
 
     def _update_user(self, user):
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         if self._current_user_id == 0:
             self._current_user_id = int(user)
             self.mu_reset_time = self._server.mu_reset_time[self._current_user_id]
@@ -382,12 +384,13 @@ class TCPRelayHandler(object):
             if self._current_user_id not in self._server.mu_detect_log_list:
                 self._server.mu_detect_log_list[self._current_user_id] = []
 
-    def _update_activity(self, data_len=0):
+    def _update_activity(self, data_len = 0):
         # tell the TCP Relay we have activities recently
         # else it will think we are inactive and timed out
         self._server.update_activity(self, data_len)
 
     def _update_stream(self, stream, status):
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         # update a stream to a new waiting status
 
         # check if status is changed
@@ -420,6 +423,7 @@ class TCPRelayHandler(object):
                     self._loop.modify(self._remote_sock_v6, event)
 
     def _write_to_sock(self, data, sock):
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         # write data to sock
         # if only some of the data are written, put remaining in the buffer
         # and update the stream to wait for writing
@@ -536,6 +540,7 @@ class TCPRelayHandler(object):
         return True
 
     def _handle_server_dns_resolved(self, error, remote_addr, server_addr, data):
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         if error:
             return
         try:
@@ -567,6 +572,7 @@ class TCPRelayHandler(object):
             logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
 
     def _get_redirect_host(self, client_address, ogn_data):
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         host_list = self._redir_list or ["*#0.0.0.0:0"]
 
         if not isinstance(host_list, list):
@@ -760,14 +766,14 @@ class TCPRelayHandler(object):
         return head + data
 
     def _handel_protocol_error(self, client_address, ogn_data):
-        if self._config['redirect_verbose']:
-            logging.warn(
-                "Protocol ERROR, TCP ogn data %s from %s:%d via port %d" %
-                (binascii.hexlify(ogn_data),
-                 client_address[0],
-                 client_address[1],
-                 self._server._listen_port)
-            )
+        # if self._config['redirect_verbose']:
+        #     logging.warn(
+        #         "Protocol ERROR, TCP ogn data %s from %s:%d via port %d" %
+        #         (binascii.hexlify(ogn_data),
+        #          client_address[0],
+        #          client_address[1],
+        #          self._server._listen_port)
+        #     )
         if client_address[0] not in self._server.wrong_iplist and client_address[0] != 0 and self._server.is_cleaning_wrong_iplist == False:
             self._server.wrong_iplist[client_address[0]] = time.time()
         self._encrypt_correct = False
@@ -781,15 +787,18 @@ class TCPRelayHandler(object):
         self._is_redirect = True
         return data + ogn_data
 
+    def _handel_obfs_error(self, client_address, ogn_data):
+        pass
+
     def _handel_mu_protocol_error(self, client_address, ogn_data):
-        if self._config['redirect_verbose']:
-            logging.warn(
-                "Protocol ERROR, TCP ogn data %d from %s:%d via port %d" %
-                (len(ogn_data),
-                 client_address[0],
-                 client_address[1],
-                 self._server._listen_port)
-            )
+        # if self._config['redirect_verbose']:
+        #     logging.warn(
+        #         "Protocol ERROR, TCP ogn data %d from %s:%d via port %d" %
+        #         (len(ogn_data),
+        #          client_address[0],
+        #          client_address[1],
+        #          self._server._listen_port)
+        #     )
         if client_address[0] not in self._server.wrong_iplist and client_address[0] != 0 and self._server.is_cleaning_wrong_iplist == False:
             self._server.wrong_iplist[client_address[0]] = time.time()
         self._encrypt_correct = False
@@ -804,6 +813,7 @@ class TCPRelayHandler(object):
         return data + ogn_data
 
     def _handle_stage_connecting(self, data):
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         logging.debug("data                          >> %d" % len(data))
         logging.debug("self._data_to_write_to_remote >> %d" % len(self._data_to_write_to_remote))
         if self._is_local:
@@ -864,6 +874,7 @@ class TCPRelayHandler(object):
     # ogn 未解密的源数据
     # data 已解密的数据
     def _handle_stage_addr(self, raw_data, data):
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         # print(ogn_data,data)
         ogn_data = raw_data
         is_error = False
@@ -1232,6 +1243,7 @@ class TCPRelayHandler(object):
         return remote_sock
 
     def _handle_dns_resolved(self, result, error):
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         if error:
             self._log_error(error)
             self.destroy()
@@ -1331,6 +1343,7 @@ class TCPRelayHandler(object):
         return buffer_size
 
     def _handle_detect_rule_match(self, port):
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         if port == 80 and self._config['friendly_detect']:
             backdata = b'HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: text/html; charset=utf-8\r\n\r\n' + self._config['detect_block_html']
             backdata = self._protocol.server_pre_encrypt(backdata)
@@ -1339,6 +1352,7 @@ class TCPRelayHandler(object):
             self._write_to_sock(backdata, self._local_sock)
 
     def _data_relay(self, data):
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         ###
         # 来自客户端的数据 ==> relay server
         host = ''
@@ -1424,6 +1438,7 @@ class TCPRelayHandler(object):
         return data
 
     def _on_local_read(self):
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         # handle all local read events and dispatch them to methods for
         # each stage
         try:
@@ -1501,7 +1516,7 @@ class TCPRelayHandler(object):
 
                             if not self._protocol.obfs.server_info.recv_iv:
                                 iv_len = len(self._protocol.obfs.server_info.iv)
-                                logging.debug("iv_len %d iv %s" % (iv_len, obfs_decode[0][:iv_len]))
+                                logging.debug("iv >> %d %s" % (iv_len, obfs_decode[0][:iv_len]))
                                 self._protocol.obfs.server_info.recv_iv = obfs_decode[0][:iv_len]
                             try:
                                 # 解密
@@ -1513,11 +1528,13 @@ class TCPRelayHandler(object):
                                 logging.error("decrypt data failed, exception from %s:%d" % (self._client_address[0], self._client_address[1]))
                                 data = [0]
                         else:
+                            if obfs_decode[0] == b'E'*2048:
+                                raise Exception("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
                             data = obfs_decode[0]
 
                         # tls 混淆时, data = obfs_decode[0] => b'', 此时不应中断
                         # if not data:
-                        #     # print(self._server.multi_user_token_table)
+                        #     # logging.debug(self._server.multi_user_token_table)
                         #     logging.error('data is None')
                         #     self.destroy()
                         #     return
@@ -1677,6 +1694,7 @@ class TCPRelayHandler(object):
             self._handle_stage_addr(ogn_data, data)
 
     def _on_remote_read(self, is_remote_sock):
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         if self._config['is_multi_user'] != 0 and self._current_user_id != 0:
             if self._current_user_id not in self._server.multi_user_table:
                 self.destroy()
@@ -1847,6 +1865,7 @@ class TCPRelayHandler(object):
             self.destroy()
 
     def _on_local_write(self):
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         # handle local writable event
         if self._data_to_write_to_local:
             data = b''.join(self._data_to_write_to_local)
@@ -1856,6 +1875,7 @@ class TCPRelayHandler(object):
             self._update_stream(STREAM_DOWN, WAIT_STATUS_READING)
 
     def _on_remote_write(self):
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         # handle remote writable event
         self._stage = STAGE_STREAM
         logging.debug("self._stage >> %d" % self._stage)
@@ -1868,14 +1888,14 @@ class TCPRelayHandler(object):
             self._update_stream(STREAM_UP, WAIT_STATUS_READING)
 
     def _on_local_error(self):
-        logging.debug('got local error')
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         if self._local_sock:
             logging.error(eventloop.get_sock_error(self._local_sock))
             logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
         self.destroy()
 
     def _on_remote_error(self):
-        logging.debug('got remote error')
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         if self._remote_sock:
             logging.error(eventloop.get_sock_error(self._remote_sock))
             if self._remote_address:
@@ -1890,6 +1910,7 @@ class TCPRelayHandler(object):
         self.destroy()
 
     def handle_event(self, sock, fd, event):
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         # handle all events in this handler and dispatch them to methods
         handle = False
         if self._stage == STAGE_DESTROYED:

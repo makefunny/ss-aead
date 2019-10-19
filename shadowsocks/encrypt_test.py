@@ -3,6 +3,7 @@ from __future__ import absolute_import, division, print_function, \
 
 import sys
 import os
+import logging
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../'))
 
@@ -16,15 +17,17 @@ from shadowsocks.crypto import table
 def run(func):
     try:
         func()
-    except:
-        pass
+    except Exception as e:
+        logging.warn(e)
 
 
 def run_n(func, name):
     try:
         func(name)
-    except:
-        pass
+    except Exception as e:
+        # pass
+        logging.warn(e)
+
 
 
 def main():
@@ -48,6 +51,8 @@ def main():
     run(sodium.test_salsa20)
     print("\n""chacha20")
     run(sodium.test_chacha20)
+    print("\n""aes-128-gcm")
+    run_n(openssl.run_aead_method, "aes-128-gcm")
 
 if __name__ == '__main__':
     main()

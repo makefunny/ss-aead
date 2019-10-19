@@ -25,7 +25,9 @@ from shadowsocks.crypto import util
 from shadowsocks.crypto.aead import AeadCryptoBase, EVP_CTRL_AEAD_SET_IVLEN, \
     EVP_CTRL_AEAD_GET_TAG, EVP_CTRL_AEAD_SET_TAG
 
+
 __all__ = ['ciphers']
+
 
 libcrypto = None
 loaded = False
@@ -39,7 +41,7 @@ ctx_cleanup = None
 CIPHER_ENC_UNCHANGED = -1
 
 
-def load_openssl(crypto_path=None):
+def load_openssl(crypto_path = None):
     global loaded, libcrypto, libsodium, buf, ctx_cleanup
 
     crypto_path = dict(crypto_path) if crypto_path else dict()

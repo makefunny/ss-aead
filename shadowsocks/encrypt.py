@@ -35,13 +35,14 @@ METHOD_INFO_CRYPTO = 2
 
 method_supported = {}
 method_supported.update(rc4_md5.ciphers)
-method_supported.update(openssl.ciphers)
-method_supported.update(sodium.ciphers)
-method_supported.update(table.ciphers)
+method_supported.update(openssl.ciphers) # include aead
+method_supported.update(sodium.ciphers)  # chacha20 series
+method_supported.update(table.ciphers)   # table and none
 
 
 def random_string(length):
     return os.urandom(length)
+
 
 cached_keys = {}
 
@@ -75,7 +76,7 @@ def EVP_BytesToKey(password, key_len, iv_len):
 
 
 class Encryptor(object):
-    def __init__(self, password, method, crypto_path=None, iv=None):
+    def __init__(self, password, method, crypto_path = None, iv = None):
         """
         Crypto wrapper
         :param password: str cipher password
@@ -95,17 +96,24 @@ class Encryptor(object):
         logging.debug(self.crypto_path)
         method = method.lower()
         self._method_info = Encryptor.get_method_info(method)
+        logging.debug(self._method_info)
         if self._method_info:
             if iv is None or len(iv) != self._method_info[1]:
                 self.cipher = self.get_cipher(
-                    password, method, CIPHER_ENC_ENCRYPTION,
-                    random_string(self._method_info[METHOD_INFO_IV_LEN])
-                )
+                    password,   method,
+                    CIPHER_ENC_ENCRYPTION,
+                    random_string(self._method_info[METHOD_INFO_IV_LEN]))
             else:
                 if self.key:
-                    self.cipher = self.get_cipher(self.key, method, 1, iv)
+                    self.cipher = self.get_cipher(
+                        self.key,      method,
+                        CIPHER_ENC_ENCRYPTION,
+                        iv)
                 else:
-                    self.cipher = self.get_cipher(self.password, method, 1, iv)
+                    self.cipher = self.get_cipher(
+                        self.password, method,
+                        CIPHER_ENC_ENCRYPTION,
+                        iv)
         else:
             logging.error('method %s not supported' % method)
             # sys.exit(1)
@@ -128,10 +136,12 @@ class Encryptor(object):
         else:
             # key_length == 0 indicates we should use the key directly
             key, iv = password, b''
+        logging.warn(len(key))
+        logging.warn(op)
         self.key = key
         iv = iv[:m[METHOD_INFO_IV_LEN]]
         if op == CIPHER_ENC_ENCRYPTION:
-            # this iv is for cipher not decipher
+            # this iv is for cipher, not decipher
             self.cipher_iv = iv
         return m[METHOD_INFO_CRYPTO](method, key, iv, op, self.crypto_path)
 
@@ -147,23 +157,28 @@ class Encryptor(object):
             return self.cipher_iv + self.cipher.encrypt(buf)
 
     def decrypt(self, buf):
-        logging.debug("decrypt >> %d %s %s" % (len(buf),self.password, self.method))
+        # logging.debug("decrypt >> %d %s %s" % (len(buf),self.password, self.method))
         if len(buf) == 0:
             return buf
 
         if self.decipher is not None: #optimize
-            return self.decipher.update(buf)
+            # aead methods update(AeadCryptoBase) will lead to error => 
+            # return self.decipher.update(buf)
+            return self.decipher.decrypt(buf)
 
         decipher_iv_len = self._method_info[1]
         if len(self.iv_buf) <= decipher_iv_len:
             self.iv_buf += buf
         if len(self.iv_buf) > decipher_iv_len:
             decipher_iv = self.iv_buf[:decipher_iv_len]
-            self.decipher = self.get_cipher(self.password, self.method, CIPHER_ENC_DECRYPTION,
-                                            iv=decipher_iv)
+            self.decipher = self.get_cipher(
+                self.password, self.method,
+                CIPHER_ENC_DECRYPTION,
+                decipher_iv)
+            # logging.warn(self.decipher)
             buf = self.iv_buf[decipher_iv_len:]
             del self.iv_buf
-            return self.decipher.update(buf)
+            return self.decipher.decrypt(buf)
         else:
             return b''
 
@@ -178,8 +193,7 @@ class Encryptor(object):
             self.decipher = self.get_cipher(
                 self.password, self.method,
                 CIPHER_ENC_DECRYPTION,
-                decipher_iv
-            )
+                decipher_iv)
             # logging.debug("decipher_iv_len >> %d" % decipher_iv_len)
             buf = buf[decipher_iv_len:]
             if len(buf) == 0:
@@ -214,9 +228,9 @@ def decrypt_all(password, method, data, crypto_path=None):
     method = method.lower()
     (key, iv, m) = gen_key_iv(password, method)
     iv = data[:len(iv)]
-    data = data[len(iv):]
+    # data = data[len(iv):]
     cipher = m(method, key, iv, CIPHER_ENC_DECRYPTION, crypto_path)
-    result.append(cipher.decrypt_once(data))
+    result.append(cipher.decrypt_once(data[len(iv):]))
     return b''.join(result), key, iv
 
 
@@ -257,6 +271,7 @@ def encrypt_new_iv(method):
 CIPHERS_TO_TEST = [
     'aes-128-cfb',
     'aes-256-cfb',
+    'aes-128-gcm',
     'aes-256-gcm',
     'rc4-md5',
     'salsa20',
@@ -268,10 +283,11 @@ CIPHERS_TO_TEST = [
 def test_encryptor():
     from os import urandom
     plain = urandom(10240)
+    key = b'key'
     for method in CIPHERS_TO_TEST:
-        logging.warn(method)
-        encryptor = Encryptor(b'key', method)
-        decryptor = Encryptor(b'key', method)
+        logging.warn("key >> %s method >> %s" % (key, method))
+        encryptor = Encryptor(key, method)
+        decryptor = Encryptor(key, method)
         cipher = encryptor.encrypt(plain)
         plain2 = decryptor.decrypt(cipher)
         assert plain == plain2
@@ -280,10 +296,12 @@ def test_encryptor():
 def test_encrypt_all():
     from os import urandom
     plain = urandom(10240)
+    # plain = b"asdasdsadasd"
+    init_key = b'key'
     for method in CIPHERS_TO_TEST:
-        logging.warn(method)
-        cipher = encrypt_all(b'key', method, plain)
-        plain2, key, iv = decrypt_all(b'key', method, cipher)
+        logging.warn("init_key >> %s method >> %s" % (init_key, method))
+        cipher = encrypt_all(init_key, method, plain)
+        plain2, key, iv = decrypt_all(init_key, method, cipher)
         assert plain == plain2
 
 
@@ -299,6 +317,6 @@ def test_encrypt_all_m():
 
 
 if __name__ == '__main__':
-    test_encrypt_all()
     test_encryptor()
+    test_encrypt_all()
     test_encrypt_all_m()
