@@ -26,6 +26,7 @@ __all__ = ['ciphers']
 
 cached_tables = {}
 
+
 if hasattr(string, 'maketrans'):
     maketrans = string.maketrans
     translate = string.translate
