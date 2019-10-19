@@ -93,10 +93,10 @@ class Encryptor(object):
         self.decipher = None
         self.decipher_iv = None
         self.crypto_path = crypto_path
-        logging.debug(self.crypto_path)
+        # logging.debug(self.crypto_path)
         method = method.lower()
         self._method_info = Encryptor.get_method_info(method)
-        logging.debug(self._method_info)
+        # logging.debug(self._method_info)
         if self._method_info:
             if iv is None or len(iv) != self._method_info[1]:
                 self.cipher = self.get_cipher(
@@ -136,8 +136,8 @@ class Encryptor(object):
         else:
             # key_length == 0 indicates we should use the key directly
             key, iv = password, b''
-        logging.warn(len(key))
-        logging.warn(op)
+        # logging.warn(len(key))
+        # logging.warn(op)
         self.key = key
         iv = iv[:m[METHOD_INFO_IV_LEN]]
         if op == CIPHER_ENC_ENCRYPTION:
