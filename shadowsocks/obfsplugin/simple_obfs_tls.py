@@ -86,6 +86,7 @@ class simple_obfs_tls(plain.plain):
         return data
 
     def client_encode(self, buf):
+        # why ?
         raise Exception('Need to finish')
         if self.obfs_stage == -1:
             return buf

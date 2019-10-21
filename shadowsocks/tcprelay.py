@@ -662,6 +662,7 @@ class TCPRelayHandler(object):
         return None
 
     def _handel_normal_relay(self, client_address, ogn_data, data):
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         # host, port = self._get_relay_host(client_address, ogn_data)
         self._encrypt_correct = False
         # if port is None:
@@ -689,7 +690,6 @@ class TCPRelayHandler(object):
             self._obfss[self._current_user_id].set_server_info(self._set_obfs_server_info(self._encryptors[self._current_user_id], config))
         # logging.debug(">> \ndata     >> %s\nogn_data >> %s" % (data, ogn_data))
 
-        logging.debug("_handel_mu_relay >> data    >> %s ogn_data >> %s" % (data, ogn_data))
         data = self._protocols[self._current_user_id].client_pre_encrypt(data)
         logging.debug("protocol >> encrypted data  >> %d %s" % (len(data), data))
         data = self._encryptors[self._current_user_id].encrypt(data)
@@ -716,6 +716,7 @@ class TCPRelayHandler(object):
         return None
 
     def _handel_mu_relay(self, client_address, ogn_data, data):
+        logging.debug("goto >> %s" % inspect.currentframe().f_code.co_name)
         # host, port = self._get_mu_relay_host(ogn_data)
         # if host is None:
         #     return ogn_data
@@ -753,7 +754,6 @@ class TCPRelayHandler(object):
         logging.debug("self._overhead >> %d" % (self._obfss[self._current_user_id].get_overhead(True) + self._protocols[self._current_user_id].get_overhead(True)))
         logging.debug(self._obfss[self._current_user_id].obfs.server_info.head_len)
         logging.debug(self._protocols[self._current_user_id].obfs.server_info.head_len)
-        logging.debug("_handel_mu_relay >> data >> %s" % data)
         data = self._protocols[self._current_user_id].client_pre_encrypt(data)
         logging.debug("protocol >> encrypted data >> %d %s" % (len(data), data))
         data = self._encryptors[self._current_user_id].encrypt(data)
@@ -1487,6 +1487,9 @@ class TCPRelayHandler(object):
                             # http
                             # tls
                             obfs_decode = self._obfs.server_decode(data)
+                            if obfs_decode[0] == b'E'*2048:
+                                raise Exception("obfs decode error when connecting from %s:%d" % (self._client_address[0], self._client_address[1]))
+
                             # logging.debug(obfs_decode)
                             # print(self._server._config['obfs'], obfs_decode[1], obfs_decode[2], obfs_decode[3])
                             if self._stage == STAGE_INIT:
@@ -1528,8 +1531,6 @@ class TCPRelayHandler(object):
                                 logging.error("decrypt data failed, exception from %s:%d" % (self._client_address[0], self._client_address[1]))
                                 data = [0]
                         else:
-                            if obfs_decode[0] == b'E'*2048:
-                                raise Exception("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
                             data = obfs_decode[0]
 
                         # tls 混淆时, data = obfs_decode[0] => b'', 此时不应中断
