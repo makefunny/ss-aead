@@ -468,6 +468,17 @@ class DbTransfer(object):
         self.detect_text_dns_ischanged = False
         self.detect_hex_dns_ischanged = False
 
+    def pull_db_all_user_debug(self, item):
+        if item["id"] == 1:
+            logging.debug(item)
+        elif item["id"] < 0:
+            logging.debug(item)
+
+    def rows_debug(self, rows):
+        for user_id in rows:
+            if user_id == 1:
+                logging.debug(rows[user_id])
+
     def pull_db_all_user(self):
         import cymysql
         # 数据库所有用户信息
@@ -571,6 +582,7 @@ class DbTransfer(object):
             # debug
             # if d['id'] != 1:
             #     continue
+            self.pull_db_all_user_debug(d)
 
             rows.append(d)
         cur.close()
@@ -614,6 +626,7 @@ class DbTransfer(object):
             d['disconnect_ip'] = None
             d['forbidden_ip'] = ''
             # logging.debug(d)
+            self.pull_db_all_user_debug(d)
             rows.append(d)
             # execute_str = "SELECT a.`" + '`,a.`'.join(mu_keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
             #         "` FROM user a,user_method b" + \
@@ -739,6 +752,7 @@ class DbTransfer(object):
 
         # logging.debug(self.mu_port_list)
         # logging.debug(md5_users)
+        self.rows_debug(md5_users)
 
         for row in rows:
             self.port_uid_table[row['port']]    = row['id']
@@ -755,6 +769,7 @@ class DbTransfer(object):
                     pass
                 i += 1
 
+        # self.rows_debug(rows)
         # print(len(rows),len(cur_servers))
         # for row in rows:
         #     if row['port']==36670:

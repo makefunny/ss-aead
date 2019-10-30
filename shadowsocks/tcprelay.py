@@ -30,6 +30,7 @@ import platform
 import threading
 import os
 import inspect
+import constants as CONSTANTS
 
 from shadowsocks import encrypt, obfs, eventloop, shell, common
 from shadowsocks.common import pre_parse_header, parse_header, IPNetwork, PortRange
@@ -747,7 +748,7 @@ class TCPRelayHandler(object):
             self._obfss[self._current_user_id]      = obfs.obfs(config['obfs'])
             self._protocols[self._current_user_id].set_server_info(self._set_protocol_server_info(self._encryptors[self._current_user_id], config))
             self._obfss[self._current_user_id].set_server_info(self._set_obfs_server_info(self._encryptors[self._current_user_id], config))
-        
+
         # logging.debug("_handel_mu_relay >> data >> %s ogn_data >> %s" % (data, ogn_data))
         logging.debug(self._stage)
         logging.debug("self._overhead >> %d" % self._overhead)
@@ -1487,9 +1488,6 @@ class TCPRelayHandler(object):
                             # http
                             # tls
                             obfs_decode = self._obfs.server_decode(data)
-                            if obfs_decode[0] == b'E'*2048:
-                                raise Exception("obfs decode error when connecting from %s:%d" % (self._client_address[0], self._client_address[1]))
-
                             # logging.debug(obfs_decode)
                             # print(self._server._config['obfs'], obfs_decode[1], obfs_decode[2], obfs_decode[3])
                             if self._stage == STAGE_INIT:
@@ -1498,6 +1496,10 @@ class TCPRelayHandler(object):
                                 logging.debug("self._overhead %d" % self._overhead)
                                 server_info = self._protocol.get_server_info()
                                 server_info.overhead = self._overhead
+
+                            if obfs_decode[0] == b'E'*2048:
+                                raise Exception("obfs decode error when connecting from %s:%d" % (self._client_address[0], self._client_address[1]))
+
                         except Exception as e:
                             shell.print_exception(e)
                             logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
@@ -1506,13 +1508,13 @@ class TCPRelayHandler(object):
                         need_sendback = False
                         if obfs_decode[2]:
                             host_name = ''
-                            if self._server._config["is_multi_user"] == 1 and self._current_user_id == 0:
+                            if self._server._config["is_multi_user"] == CONSTANTS.is_multi_user_OBFS and self._current_user_id == 0:
                                 if self._server._config["obfs"] == b"tls1.2_ticket_auth" or self._server._config["obfs"] == b"tls1.2_ticket_fastauth":
                                     if(len(obfs_decode) > 3):
                                         host = obfs_decode[3] + ":" + str(self._server._listen_port)
                             need_sendback = True
                         if obfs_decode[1]:
-                            if self._server._config["is_multi_user"] == 1 and self._current_user_id == 0:
+                            if self._server._config["is_multi_user"] == CONSTANTS.is_multi_user_OBFS and self._current_user_id == 0:
                                 if self._server._config["obfs"] in [b"http_simple", b"http_post", b"simple_obfs_tls", b"simple_obfs_http"]:
                                     if(len(obfs_decode) > 3):
                                         host = obfs_decode[3]
@@ -1540,14 +1542,15 @@ class TCPRelayHandler(object):
                         #     self.destroy()
                         #     return
 
-                        # 混淆式 单端口多用户
+                        # 混淆式 update user by host
                         # print(self._current_user_id,len(data),data)
-                        if self._server._config["is_multi_user"] == 1 and self._current_user_id == 0:
-                            logging.info("_update_user by host (include host_name)")
+                        if self._server._config["is_multi_user"] == CONSTANTS.is_multi_user_OBFS and self._current_user_id == 0:
+                            logging.debug("_update_user by host (include host_name)")
                             if host:
                                 try:
                                     host_list = host.split(":", 2)
                                     host_name = host_list[0]
+
                                     # print(host_name, self._server.multi_user_host_table)
                                     if host_name in self._server.multi_user_host_table:
                                         # 根据 host_name 确定用户
@@ -1570,12 +1573,14 @@ class TCPRelayHandler(object):
                             logging.debug("no host match")
 
                         try:
-                            if self._server._config["protocol"] == b"auth_simple" and self._server._config["is_multi_user"] == 3:
-                                data, sendback, uid = self._protocol.server_post_decrypt(data)
-                                self._update_user(uid)
-                            elif self._server._config["protocol"] == b"auth_simple":
-                                is_Failed = True
-                                raise Exception('auth_simple is used for multi-user(type 3) only, the type is:%d' % self._server._config["is_multi_user"])
+                            # 协议式 decode
+                            if self._server._config["protocol"] == b"auth_simple":
+                                if self._server._config["is_multi_user"] == CONSTANTS.is_multi_user_PROTOCOL_AUTH_SIMPLE:
+                                    data, sendback, uid = self._protocol.server_post_decrypt(data)
+                                    self._update_user(uid)
+                                else:
+                                    is_Failed = True
+                                    raise Exception('auth_simple is used for multi-user(type 3) only, but the type is:%d' % self._server._config["is_multi_user"])
                             else:
                                 # 默认注入了 update_user_func
                                 data, sendback  = self._protocol.server_post_decrypt(data)
@@ -1584,49 +1589,51 @@ class TCPRelayHandler(object):
 
                             # logging.info('%d %d %d %s' % (self._server._config["is_multi_user"], self._current_user_id, self._stage, data))
 
-                            # 混淆式 单端口多用户
-                            if self._server._config["is_multi_user"] == 2 and self._current_user_id == 0:
+                            # 协议式 didn't get user
+                            if self._server._config["is_multi_user"] == CONSTANTS.is_multi_user_PROTOCOL and self._current_user_id == 0:
                                 is_Failed = True
                                 if data:
                                     raise Exception(
                                         'The port is for multi-user only , but the key remote provided is error or empty, so The connection has been rejected, when connect from %s:%d via port %d' %
                                         (self._client_address[0], self._client_address[1], self._server._listen_port))
-                                else:
-                                    raise Exception(
-                                        'The port is for multi-user only , but the key remote provided is error or empty, and the data is "", when connect from %s:%d via port %d' %
-                                        (self._client_address[0], self._client_address[1], self._server._listen_port))
+                                # else:
+                                #     raise Exception(
+                                #         'The port is for multi-user only , but the key remote provided is error or empty, and the data is "", when connect from %s:%d via port %d' %
+                                #         (self._client_address[0], self._client_address[1], self._server._listen_port))
 
-                            if self._server._config["is_multi_user"] == 2 and self._current_user_id == 0 and ogn_data:
+                            if self._server._config["is_multi_user"] == CONSTANTS.is_multi_user_PROTOCOL and self._current_user_id == 0 and ogn_data:
                                 self._header_buf = ogn_data[:]
 
                             is_relay = self.is_match_relay_rule_mu()
+                            if not is_relay:
+                                if need_sendback:
+                                    data_sendback = self._obfs.server_encode(b'')
+                                    try:
+                                        logging.debug("data_sendback")
+                                        self._write_to_sock(data_sendback, self._local_sock)
+                                    except Exception as e:
+                                        shell.print_exception(e)
+                                        if self._config['verbose']:
+                                            traceback.print_exc()
+                                        logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
+                                        self.destroy()
+                                        return
+                                if sendback:
+                                    logging.debug("sendback")
+                                    backdata = self._protocol.server_pre_encrypt(b'')
+                                    backdata = self._encryptor.encrypt(backdata)
+                                    backdata = self._obfs.server_encode(backdata)
+                                    logging.debug("backdata >> %s" % backdata)
+                                    try:
+                                        self._write_to_sock(backdata, self._local_sock)
+                                    except Exception as e:
+                                        shell.print_exception(e)
+                                        if self._config['verbose']:
+                                            traceback.print_exc()
+                                        logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
+                                        self.destroy()
+                                        return
 
-                            if not is_relay and need_sendback:
-                                data_sendback = self._obfs.server_encode(b'')
-                                try:
-                                    self._write_to_sock(data_sendback, self._local_sock)
-                                except Exception as e:
-                                    shell.print_exception(e)
-                                    if self._config['verbose']:
-                                        traceback.print_exc()
-                                    logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
-                                    self.destroy()
-                                    return
-
-                            if not is_relay and sendback:
-                                backdata = self._protocol.server_pre_encrypt(b'')
-                                backdata = self._encryptor.encrypt(backdata)
-                                backdata = self._obfs.server_encode(backdata)
-                                logging.debug("backdata >> %s" % backdata)
-                                try:
-                                    self._write_to_sock(backdata, self._local_sock)
-                                except Exception as e:
-                                    shell.print_exception(e)
-                                    if self._config['verbose']:
-                                        traceback.print_exc()
-                                    logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
-                                    self.destroy()
-                                    return
                         except Exception as e:
                             shell.print_exception(e)
                             logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
@@ -2087,17 +2094,17 @@ class TCPRelay(object):
             self.multi_user_token_table  = {}
             self.multi_user_table = self._config['users_table']
             # print(self._config['users_table'])
-            for id in self.multi_user_table:
-                self.multi_user_token_table[self.multi_user_table[id]['token']] = id
-                self.multi_user_host_table[common.get_mu_host(id, self.multi_user_table[id]['md5'])] = id
+            for user_id in self.multi_user_table:
+                self.multi_user_token_table[self.multi_user_table[user_id]['token']] = user_id
+                self.multi_user_host_table[common.get_mu_host(user_id, self.multi_user_table[user_id]['md5'])] = user_id
 
-                if 'node_speedlimit' not in self.multi_user_table[id]:
+                if 'node_speedlimit' not in self.multi_user_table[user_id]:
                     bandwidth = 0
                 else:
-                    bandwidth = float(self.multi_user_table[id]['node_speedlimit']) * 128
+                    bandwidth = float(self.multi_user_table[user_id]['node_speedlimit']) * 128
 
-                self.mu_speed_tester_u[id] = SpeedTester(bandwidth)
-                self.mu_speed_tester_d[id] = SpeedTester(bandwidth)
+                self.mu_speed_tester_u[user_id] = SpeedTester(bandwidth)
+                self.mu_speed_tester_d[user_id] = SpeedTester(bandwidth)
 
         self.is_cleaning_detect_log = False
         self.is_cleaning_mu_detect_log_list = False

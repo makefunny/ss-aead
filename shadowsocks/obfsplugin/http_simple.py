@@ -155,12 +155,14 @@ class http_simple(plain.plain):
         return b''
 
     def get_host_from_http_header(self, buf):
-        ret_buf = b''
-        lines = buf.split(b'\r\n')
-        if lines and len(lines) > 1:
-            for line in lines:
-                if match_begin(line, b"Host: "):
-                    return common.to_str(line[6:])
+        start = buf.find(b"Host: ")
+        if start == -1:
+            return b''
+        # b"\r" = 13
+        end   = buf.find(13, start)
+        if end == -1:
+            return b''
+        return buf[start:end]
 
     def not_match_return(self, buf):
         self.has_sent_header = True
