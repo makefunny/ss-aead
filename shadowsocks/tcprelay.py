@@ -1548,8 +1548,8 @@ class TCPRelayHandler(object):
                             logging.debug("_update_user by host (include host_name)")
                             if host:
                                 try:
-                                    host_list = host.split(":", 2)
-                                    host_name = host_list[0]
+                                    host_list = host.split(b":", 2)
+                                    host_name = host_list[1].strip(b" ").decode("utf8")
 
                                     # print(host_name, self._server.multi_user_host_table)
                                     if host_name in self._server.multi_user_host_table:
