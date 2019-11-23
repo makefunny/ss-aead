@@ -54,8 +54,8 @@ class simple_obfs_http(plain.plain):
         self.port = 0
         self.recv_buffer = b''
 
-        self.curl_version = b"7." + common.to_bytes(str(random.randint(0, 51))) + b"." + common.to_bytes(str(random.randint(0, 2)))
-        self.nginx_version = b"1." + common.to_bytes(str(random.randint(0, 11))) + b"." + common.to_bytes(str(random.randint(0, 12)))
+        self.curl_version = b"7." + to_bytes(str(random.randint(0, 51))) + b"." + to_bytes(str(random.randint(0, 2)))
+        self.nginx_version = b"1." + to_bytes(str(random.randint(0, 11))) + b"." + to_bytes(str(random.randint(0, 12)))
 
     def encode_head(self, buf):
         hexstr = binascii.hexlify(buf)
@@ -65,7 +65,7 @@ class simple_obfs_http(plain.plain):
         return b''.join(chs)
 
     def client_encode(self, buf):
-        raise Exception('Need to finish')
+        # raise Exception('Need to finish')
         if self.has_sent_header:
             return buf
         port = b''
@@ -83,14 +83,14 @@ class simple_obfs_http(plain.plain):
         http_head += b"User-Agent: curl/" + self.curl_version + b"\r\n"
         http_head += b"Upgrade: websocket\r\n"
         http_head += b"Connection: Upgrade\r\n"
-        http_head += b"Sec-WebSocket-Key: " + common.to_bytes(common.random_base64_str(64)) + b"\r\n"
-        http_head += b"Content-Length: " + len(buf) + b"\r\n"
+        http_head += b"Sec-WebSocket-Key: " + to_bytes(common.random_base64_str(64)) + b"\r\n"
+        http_head += b"Content-Length: " + to_bytes(str(len(buf))) + b"\r\n"
         http_head += b"\r\n"
         self.has_sent_header = True
         return http_head + buf
 
     def client_decode(self, buf):
-        raise Exception('Need to finish')
+        # raise Exception('Need to finish')
         if self.has_recv_header:
             return (buf, False)
         pos = buf.find(b'\r\n\r\n')
@@ -110,7 +110,7 @@ class simple_obfs_http(plain.plain):
         header += b'\r\n'
         header += b'Upgrade: websocket\r\n'
         header += b'Connection: Upgrade\r\n'
-        header += b'Sec-WebSocket-Accept: ' + common.to_bytes(common.random_base64_str(64)) + b'\r\n'
+        header += b'Sec-WebSocket-Accept: ' + to_bytes(common.random_base64_str(64)) + b'\r\n'
         header += b'\r\n'
         self.has_sent_header = True
         return header + buf
