@@ -1547,11 +1547,24 @@ class TCPRelayHandler(object):
                         if self._server._config["is_multi_user"] == CONSTANTS.is_multi_user_OBFS and self._current_user_id == 0:
                             logging.debug("_update_user by host (include host_name)")
                             if host:
+                                # print(host, type(host), self._server.multi_user_host_table)
                                 try:
-                                    host_list = host.split(b":", 2)
-                                    host_name = host_list[1].strip(b" ").decode("utf8")
+                                    if isinstance(host, bytes):
+                                        # b"Host: xxx.baidu.com" bytes
+                                        host_list = host.split(b":", 2)
+                                        if len(host_list) > 1:
+                                            host_name = host_list[1].strip(b" ").decode("utf8")
+                                        else:
+                                            hostname = host_list[0].strip(b" ").decode("utf8")
+                                    else:
+                                        # "xxxx.baidu.com" str
+                                        host_list = host.split(":", 2)
+                                        if len(host_list) > 1:
+                                            host_name = host_list[1].strip(" ")
+                                        else:
+                                            host_name = host_list[0].strip(" ")
 
-                                    # print(host_name, self._server.multi_user_host_table)
+                                    # logging.debug(host_name)
                                     if host_name in self._server.multi_user_host_table:
                                         # 根据 host_name 确定用户
                                         self._update_user(self._server.multi_user_host_table[host_name])
@@ -1561,9 +1574,9 @@ class TCPRelayHandler(object):
                                             (host_name, self._client_address[0], self._client_address[1], self._server._listen_port))
                                         is_Failed = True
                                 except Exception as e:
-                                    # logging.error(e)
+                                    logging.error(e)
                                     logging.error(
-                                        'The mu hostname is error, so The connection has been rejected, when connect from %s:%d via port %d' %
+                                        'Cannot get mu hostname, so The connection has been rejected, when connect from %s:%d via port %d' %
                                         (self._client_address[0], self._client_address[1], self._server._listen_port))
                                     is_Failed = True
                             else:
