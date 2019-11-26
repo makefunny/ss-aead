@@ -1547,20 +1547,27 @@ class TCPRelayHandler(object):
                         if self._server._config["is_multi_user"] == CONSTANTS.is_multi_user_OBFS and self._current_user_id == 0:
                             logging.debug("_update_user by host (include host_name)")
                             if host:
+                                logging.debug("host >> %s" % host)
                                 # print(host, type(host), self._server.multi_user_host_table)
                                 try:
                                     if isinstance(host, bytes):
                                         # b"Host: xxx.baidu.com" bytes
                                         host_list = host.split(b":", 2)
                                         if len(host_list) > 1:
-                                            host_name = host_list[1].strip(b" ").decode("utf8")
+                                            if host_list[0] == b"Host":
+                                                host_name = host_list[1].strip(b" ").decode("utf8")
+                                            else:
+                                                host_name = host_list[0].strip(b" ").decode("utf8")
                                         else:
                                             hostname = host_list[0].strip(b" ").decode("utf8")
                                     else:
                                         # "xxxx.baidu.com" str
                                         host_list = host.split(":", 2)
                                         if len(host_list) > 1:
-                                            host_name = host_list[1].strip(" ")
+                                            if host_list[0] == "Host":
+                                                host_name = host_list[1].strip(" ")
+                                            else:
+                                                host_name = host_list[0].strip(" ")
                                         else:
                                             host_name = host_list[0].strip(" ")
 
