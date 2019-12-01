@@ -22,6 +22,22 @@ switchrule = None
 db_instance = None
 
 
+def G_socket_ping(tcp_tuple = None, host = None, port = None):
+    if not tcp_tuple:
+        tcp_tuple = (host, port)
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    t_start = round(time.time() * 1000)
+    try:
+        s.settimeout(1)
+        s.connect(tcp_tuple)
+        s.shutdown(socket.SHUT_RD)
+        t_end = round(time.time() * 1000)
+        s.close()
+        return t_end - t_start
+    except Exception as e:
+        s.close()
+        return -1
+
 class DbTransfer(object):
 
     def __init__(self):
@@ -57,30 +73,51 @@ class DbTransfer(object):
 
         self.enable_dnsLog = True
 
+        self.MYSQL_HOST = get_config().MYSQL_HOST
+        self.MYSQL_PORT = get_config().MYSQL_PORT
+        self.MYSQL_USER = get_config().MYSQL_USER
+        self.MYSQL_PASS = get_config().MYSQL_PASS
+        self.MYSQL_DB = get_config().MYSQL_DB
+
+        self.MYSQL_SSL_ENABLE = get_config().MYSQL_SSL_ENABLE
+        self.MYSQL_SSL_CA = get_config().MYSQL_SSL_CA
+        self.MYSQL_SSL_CERT = get_config().MYSQL_SSL_CERT
+        self.MYSQL_SSL_KEY = get_config().MYSQL_SSL_KEY
+
     def getMysqlConn(self):
         import cymysql
-        if get_config().MYSQL_SSL_ENABLE == 1:
+        if self.MYSQL_SSL_ENABLE == 1:
             conn = cymysql.connect(
-                host=get_config().MYSQL_HOST,
-                port=get_config().MYSQL_PORT,
-                user=get_config().MYSQL_USER,
-                passwd=get_config().MYSQL_PASS,
-                db=get_config().MYSQL_DB,
+                host=self.MYSQL_HOST,
+                port=self.MYSQL_PORT,
+                user=self.MYSQL_USER,
+                passwd=self.MYSQL_PASS,
+                db=self.MYSQL_DB,
                 charset='utf8',
                 ssl={
-                    'ca': get_config().MYSQL_SSL_CA,
-                    'cert': get_config().MYSQL_SSL_CERT,
-                    'key': get_config().MYSQL_SSL_KEY})
+                    'ca': self.MYSQL_SSL_CA,
+                    'cert': self.MYSQL_SSL_CERT,
+                    'key': self.MYSQL_SSL_KEY})
         else:
             conn = cymysql.connect(
-                host=get_config().MYSQL_HOST,
-                port=get_config().MYSQL_PORT,
-                user=get_config().MYSQL_USER,
-                passwd=get_config().MYSQL_PASS,
-                db=get_config().MYSQL_DB,
+                host=self.MYSQL_HOST,
+                port=self.MYSQL_PORT,
+                user=self.MYSQL_USER,
+                passwd=self.MYSQL_PASS,
+                db=self.MYSQL_DB,
                 charset='utf8')
         conn.autocommit(True)
         return conn
+
+    def isMysqlConnectable(self):
+        failed = 0
+        for i in range(2):
+            if socket_ping((self.MYSQL_HOST, self.MYSQL_PORT)) == -1:
+                failed = failed + 1
+        if failed == 2:
+            return False
+        else:
+            return True
 
     def update_all_user(self, dt_transfer):
         import cymysql
@@ -1077,6 +1114,11 @@ class DbTransfer(object):
                     logging.error(trace)
                     # logging.warn('db thread except:%s' % e)
                 if db_instance.event.wait(60) or not db_instance.is_all_thread_alive():
+                    # wait for db connect works properly
+                    while True:
+                        if db_instance.isMysqlConnectable() == True:
+                            break
+                        time.sleep(30)
                     break
                 if db_instance.has_stopped:
                     break
