@@ -112,7 +112,7 @@ class DbTransfer(object):
     def isMysqlConnectable(self):
         failed = 0
         for i in range(2):
-            if socket_ping((self.MYSQL_HOST, self.MYSQL_PORT)) == -1:
+            if G_socket_ping((self.MYSQL_HOST, self.MYSQL_PORT)) == -1:
                 failed = failed + 1
         if failed == 2:
             return False
