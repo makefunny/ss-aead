@@ -262,6 +262,9 @@ class UDPRelay(object):
         self._relay_rules = self._config['relay_rules'].copy()
         self._is_pushing_relay_rules = False
 
+        self._common_relay_rule = None
+        self.is_pushing_common_relay_rule = False
+
         addrs = socket.getaddrinfo(self._listen_addr, self._listen_port, 0, socket.SOCK_DGRAM, socket.SOL_UDP)
         if len(addrs) == 0:
             raise Exception("can't get addrinfo for %s:%d" % (self._listen_addr, self._listen_port))
@@ -1046,6 +1049,11 @@ class UDPRelay(object):
         self._is_pushing_relay_rules = True
         self._relay_rules = rules.copy()
         self._is_pushing_relay_rules = False
+
+    def push_common_relay_rule(self, rule):
+        self.is_pushing_common_relay_rule = True
+        self._common_relay_rule = rule.copy()
+        self.is_pushing_common_relay_rule = False
 
     def close(self, next_tick=False):
         logging.debug('UDP close')
