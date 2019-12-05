@@ -110,12 +110,12 @@ class DbTransfer(object):
                     'key': self.MYSQL_SSL_KEY})
         else:
             conn = cymysql.connect(
-                host=self.MYSQL_HOST,
-                port=self.MYSQL_PORT,
-                user=self.MYSQL_USER,
-                passwd=self.MYSQL_PASS,
-                db=self.MYSQL_DB,
-                charset='utf8')
+                host    =self.MYSQL_HOST,
+                port    =self.MYSQL_PORT,
+                user    =self.MYSQL_USER,
+                passwd  =self.MYSQL_PASS,
+                db      =self.MYSQL_DB,
+                charset ='utf8')
         conn.autocommit(True)
         return conn
 
