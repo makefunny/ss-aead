@@ -139,6 +139,28 @@ class DbTransfer(object):
         else:
             return True
 
+    def mass_insert_traffic(self, pid, conn, dt_transfer):
+        traffic_show = self.trafficShow((dt_transfer[pid][0] +
+                                      dt_transfer[pid][1]) *
+                                     self.traffic_rate)
+        if self.port_uid_table[pid] == 1:
+            logging.info("user_id >> %d >> rate %f >> %s" % (self.port_uid_table[pid], self.traffic_rate, traffic_show))
+        cur = conn.cursor()
+        cur.execute("INSERT INTO `user_traffic_log` (`id`, `user_id`, `u`, `d`, `Node_ID`, `rate`, `traffic`, `log_time`) VALUES (NULL, '" +
+                    str(self.port_uid_table[pid]) +
+                    "', '" +
+                    str(dt_transfer[pid][0]) +
+                    "', '" +
+                    str(dt_transfer[pid][1]) +
+                    "', '" +
+                    str(self.NODE_ID) +
+                    "', '" +
+                    str(self.traffic_rate) +
+                    "', '" +
+                    traffic_show +
+                    "', unix_timestamp());")
+        cur.close()
+
     def update_all_user(self, dt_transfer):
         import cymysql
         update_transfer = {}
@@ -170,23 +192,7 @@ class DbTransfer(object):
 
             alive_user_count = alive_user_count + 1
 
-            cur = conn.cursor()
-            cur.execute("INSERT INTO `user_traffic_log` (`id`, `user_id`, `u`, `d`, `Node_ID`, `rate`, `traffic`, `log_time`) VALUES (NULL, '" +
-                        str(self.port_uid_table[id]) +
-                        "', '" +
-                        str(dt_transfer[id][0]) +
-                        "', '" +
-                        str(dt_transfer[id][1]) +
-                        "', '" +
-                        str(get_config().NODE_ID) +
-                        "', '" +
-                        str(self.traffic_rate) +
-                        "', '" +
-                        self.trafficShow((dt_transfer[id][0] +
-                                          dt_transfer[id][1]) *
-                                         self.traffic_rate) +
-                        "', unix_timestamp()); ")
-            cur.close()
+            self.mass_insert_traffic(id, conn, dt_transfer)
 
             bandwidth_thistime = bandwidth_thistime + \
                 (dt_transfer[id][0] + dt_transfer[id][1])
@@ -331,7 +337,26 @@ class DbTransfer(object):
 
         return str(round((Traffic / 1024 / 1024 / 1024), 2)) + "GB"
 
-    def push_db_all_user(self):
+    def push_db_all_user(self, test_mysql_conn = False):
+
+        if test_mysql_conn == True:
+            # logging.info('test_mysql_conn == True')
+            # wait for db connect works properly
+            test_mysql_conn_Failed = False
+            if self.isMysqlConnectable() == True:
+                # logging.info('db connectable')
+                try:
+                    conn = self.getMysqlConn()
+                    # logging.info('get mysql connection!')
+                except Exception as e:
+                    test_mysql_conn_Failed = True
+            else:
+                test_mysql_conn_Failed = True
+            if test_mysql_conn_Failed == True:
+                # logging.info('db mysql conn will retry after 30s')
+                time.sleep(30)
+                return self.push_db_all_user(test_mysql_conn = True)
+
         # 更新用户流量到数据库
         last_transfer = self.last_update_transfer
         curr_transfer = ServerPool.get_instance().get_servers_transfer()
@@ -354,6 +379,25 @@ class DbTransfer(object):
                 if curr_transfer[id][0] + curr_transfer[id][1] <= 0:
                     continue
                 dt_transfer[id] = [curr_transfer[id][0], curr_transfer[id][1]]
+
+        if dt_transfer and test_mysql_conn == False:
+            # logging.info('test_mysql_conn == False')
+            # wait for db connect works properly
+            test_mysql_conn_Failed = False
+            if self.isMysqlConnectable() == True:
+                # logging.info('db connectable')
+                try:
+                    conn = self.getMysqlConn()
+                    # logging.info('get mysql connection!')
+                except Exception as e:
+                    test_mysql_conn_Failed = True
+            else:
+                test_mysql_conn_Failed = True
+            if test_mysql_conn_Failed == True:
+                # logging.info('db mysql conn will retry after 30s')
+                time.sleep(30)
+                return self.push_db_all_user(test_mysql_conn = True)
+
         for id in dt_transfer.keys():
             last = last_transfer.get(id, [0, 0])
             last_transfer[id] = [last[0] + dt_transfer[id]
@@ -1172,22 +1216,18 @@ class DbTransfer(object):
                     db_instance.del_server_out_of_bound_safe(last_rows, rows)
                     db_instance.reset_detect_rule_status()
                     last_rows = rows
+                    # logging.info('try end')
                 except Exception as e:
                     trace = traceback.format_exc()
                     logging.error(trace)
                     # logging.warn('db thread except:%s' % e)
+                # logging.info('except end')
+                # waiting for stop signal
+                # stop => signal is True
+                # continue => signal is False
                 if db_instance.event.wait(60) or not db_instance.is_all_thread_alive():
-                    # wait for db connect works properly
-                    while True:
-                        if db_instance.isMysqlConnectable() == True:
-                            try:
-                                conn = db_instance.getMysqlConn()
-                                break
-                            except Exception as e:
-                                logging.error(e)
-                                logging.info('db connect will retry after 30s')
-                        time.sleep(30)
                     break
+                # logging.info('if db_instance.has_stopped:')
                 if db_instance.has_stopped:
                     break
         except KeyboardInterrupt as e:
