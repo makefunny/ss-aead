@@ -143,8 +143,8 @@ class DbTransfer(object):
         traffic_show = self.trafficShow((dt_transfer[pid][0] +
                                       dt_transfer[pid][1]) *
                                      self.traffic_rate)
-        if self.port_uid_table[pid] == 1:
-            logging.info("user_id >> %d >> rate %f >> %s" % (self.port_uid_table[pid], self.traffic_rate, traffic_show))
+        # if self.port_uid_table[pid] == 1:
+            # logging.info("user_id >> %d >> rate %f >> %s" % (self.port_uid_table[pid], self.traffic_rate, traffic_show))
         cur = conn.cursor()
         cur.execute("INSERT INTO `user_traffic_log` (`id`, `user_id`, `u`, `d`, `Node_ID`, `rate`, `traffic`, `log_time`) VALUES (NULL, '" +
                     str(self.port_uid_table[pid]) +
