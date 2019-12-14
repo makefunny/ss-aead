@@ -1420,7 +1420,7 @@ class TCPRelayHandler(object):
             data = self._handel_mu_protocol_error(self._client_address, ogn_data)
 
         # encrypt for relay_destination
-        # user custom relay, may have no rule
+        # user custom relay, maybe have no rule
         if self._relay_type == CONSTANTS.RELAY_CUSTOM and self._is_relay == True:
             logging.debug("data from client decrypted  >> %d" % len(data))
             data = self._protocols[self._current_user_id].client_pre_encrypt(data)
