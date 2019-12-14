@@ -664,7 +664,7 @@ class TCPRelayHandler(object):
         return (None, None)
 
     def _get_relay_rule(self, client_address, ogn_data):
-        if self._relay_type == CONSTANTS.RELAY_SS_NODE:
+        if self._relay_type == CONSTANTS.RELAY_CUSTOM:
             for id in self._relay_rules:
                 return self._relay_rules[id]
             return None
@@ -683,7 +683,7 @@ class TCPRelayHandler(object):
     def _base_handel_relay(self, data, rule):
         head = b"\x03" + common.to_bytes(common.chr(len(rule['des_ip']))) + common.to_bytes(rule['des_ip']) + struct.pack('>H', rule['des_port'])
         logging.debug("self._relay_type >> %s" % self._relay_type)
-        if self._relay_type == CONSTANTS.RELAY_SS_NODE:
+        if self._relay_type == CONSTANTS.RELAY_CUSTOM:
             if self._current_user_id not in self._encryptors:
                 self._encryptors[self._current_user_id] = encrypt.Encryptor(common.to_bytes(rule['des_passwd']), rule['des_method'])
                 config = {}
@@ -739,7 +739,7 @@ class TCPRelayHandler(object):
         if self._current_user_id == 0:
             return None
 
-        if self._relay_type == CONSTANTS.RELAY_SS_NODE:
+        if self._relay_type == CONSTANTS.RELAY_CUSTOM:
             for id in self._relay_rules:
                 if self._relay_rules[id]['user_id'] == self._current_user_id:
                     return self._relay_rules[id]
@@ -1420,7 +1420,7 @@ class TCPRelayHandler(object):
             data = self._handel_mu_protocol_error(self._client_address, ogn_data)
 
         # encrypt for relay_destination
-        if self._relay_type == CONSTANTS.RELAY_SS_NODE:
+        if self._relay_type == CONSTANTS.RELAY_CUSTOM:
             logging.debug("data from client decrypted  >> %d" % len(data))
             data = self._protocols[self._current_user_id].client_pre_encrypt(data)
             logging.debug("data encrypted by protocol  >> %d" % len(data))
@@ -1807,7 +1807,7 @@ class TCPRelayHandler(object):
                 logging.debug("self._is_relay        >> %d" % self._is_relay)
                 if self._encrypt_correct:
                     # logging.debug("data           >> %d %s" % (len(data), data))
-                    if self._relay_type == CONSTANTS.RELAY_SS_NODE:
+                    if self._relay_type == CONSTANTS.RELAY_CUSTOM:
                         try:
                             # logging.debug(self._obfss)
                             obfs_decode = self._obfss[self._current_user_id].client_decode(data)
@@ -1874,7 +1874,7 @@ class TCPRelayHandler(object):
                 # self._encrypt_correct = False
                 if not self._encrypt_correct and self._is_relay:
 
-                    if self._relay_type == CONSTANTS.RELAY_SS_NODE:
+                    if self._relay_type == CONSTANTS.RELAY_CUSTOM:
                         try:
                             # logging.debug(self._obfss)
                             obfs_decode = self._obfss[self._current_user_id].client_decode(data)

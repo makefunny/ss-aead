@@ -999,7 +999,7 @@ class DbTransfer(object):
 
             # logging.debug(self.relay_rule_list)
             # logging.debug(self.is_relay)
-            if self.relay_type == constants.RELAY_SS_NODE:
+            if self.relay_type == constants.RELAY_CUSTOM:
                 temp_relay_rules = {}
                 for id in self.relay_rule_list:
                     if cfg['is_multi_user'] != constants.is_multi_user_NOT_MULTI:
@@ -1066,7 +1066,7 @@ class DbTransfer(object):
                     if port in ServerPool.get_instance().udp_ipv6_servers_pool:
                         ServerPool.get_instance().udp_ipv6_servers_pool[port].modify_multi_user_table(md5_users)
 
-                if self.relay_type == constants.RELAY_SS_NODE:
+                if self.relay_type == constants.RELAY_CUSTOM:
                     temp_relay_rules = {}
                     for id in self.relay_rule_list:
                         if cfg['is_multi_user'] != constants.is_multi_user_NOT_MULTI:
