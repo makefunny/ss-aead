@@ -124,7 +124,7 @@ class DbTransfer(object):
             self.mysql_conn = self.getMysqlConnBase()
         return self.mysql_conn
 
-    def closeMysqlComm(self):
+    def closeMysqlConn(self):
         if self.mysql_conn is not None:
             self.mysql_conn.close()
             self.mysql_conn = None
@@ -313,7 +313,7 @@ class DbTransfer(object):
                     deny_file.write(deny_str)
                     deny_file.close()
         
-        self.closeMysqlComm()
+        self.closeMysqlConn()
 
         return update_transfer
 
@@ -563,7 +563,7 @@ class DbTransfer(object):
             del self.detect_hex_list_dns[id]
 
         cur.close()
-        self.closeMysqlComm()
+        self.closeMysqlConn()
 
     def reset_detect_rule_status(self):
         self.detect_text_all_ischanged = False
@@ -620,8 +620,8 @@ class DbTransfer(object):
             rows = []
             cur.close()
             conn.commit()
-            self.closeMysqlComm()
-            logging.debug('nodeinfo is None:')
+            self.closeMysqlConn()
+            logging.debug('nodeinfo is None')
             return rows
 
         logging.debug(nodeinfo)
@@ -706,7 +706,7 @@ class DbTransfer(object):
             # debug
             # if d['id'] != 1:
             #     continue
-            self.pull_db_all_user_debug(d)
+            # self.pull_db_all_user_debug(d)
 
             rows.append(d)
         cur.close()
@@ -750,7 +750,7 @@ class DbTransfer(object):
             d['disconnect_ip'] = None
             d['forbidden_ip'] = ''
             # logging.debug(d)
-            self.pull_db_all_user_debug(d)
+            # self.pull_db_all_user_debug(d)
             rows.append(d)
             # execute_str = "SELECT a.`" + '`,a.`'.join(mu_keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
             #         "` FROM user a,user_method b" + \
@@ -781,22 +781,26 @@ class DbTransfer(object):
         cur.close()
 
         self.set_detect_rule_list()
+        self.closeMysqlConn()
 
         # 读取中转规则，如果是中转节点的话
 
         if self.is_relay and self.relay_type != constants.RELAY_USER_METHOD:
+            # 为什么必须close才能继续execute？
+            # 否则cymysql报错socket not found
+            conn = self.getMysqlConn()
             self.relay_rule_list    = {}
 
             keys_relay       = ['id', 'user_id', 'des_ip']
             keys_user_method = ['port', 'method', 'passwd', 'protocol', 'protocol_param', 'obfs', 'obfs_param']
 
             cur = conn.cursor()
-            execute_str = "SELECT a." \
-                        + ',a.'.join(keys_relay) + ", c.`port`, b." \
-                        + ',b.'.join(keys_user_method) \
-                        + " FROM relay a,user_method b,user_method c WHERE a.`src_node_id` = " + str(self.NODE_ID) \
+            execute_str = "SELECT a.`" \
+                        + '`,a.`'.join(keys_relay) + "`, c.`port`, b.`" \
+                        + '`,b.`'.join(keys_user_method) \
+                        + "` FROM relay a,user_method b,user_method c WHERE a.`src_node_id` = " + str(self.NODE_ID) \
                         + " AND a.`des_user_method_id` = b.`id` AND a.`src_user_method_id` = c.`id` AND a.`is_user_method_same` = 0 AND a.`enable` = 1"
-            # logging.debug(execute_str)
+            logging.debug(execute_str)
             cur.execute(execute_str)
 
             for r in cur.fetchall():
@@ -816,7 +820,7 @@ class DbTransfer(object):
 
             cur.close()
 
-        self.closeMysqlComm()
+            self.closeMysqlConn()
         return rows
 
     def cmp(self, val1, val2):
