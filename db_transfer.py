@@ -151,7 +151,7 @@ class DbTransfer(object):
                 cur.close()
         return None
 
-    def mass_insert_traffic(self, pid, conn, dt_transfer):
+    def mass_insert_traffic(self, pid, dt_transfer):
         traffic_show = G_traffic_show((dt_transfer[pid][0] +
                                       dt_transfer[pid][1]) *
                                      self.traffic_rate)
@@ -204,7 +204,7 @@ class DbTransfer(object):
 
             alive_user_count = alive_user_count + 1
 
-            self.mass_insert_traffic(id, conn, dt_transfer)
+            self.mass_insert_traffic(id, dt_transfer)
 
             bandwidth_thistime = bandwidth_thistime + \
                 (dt_transfer[id][0] + dt_transfer[id][1])
