@@ -136,13 +136,13 @@ class DbTransfer(object):
             cur.execute(query_sql)
             if fetchall == True and fetchone == False:
                 ret = cur.fetchall()
-                if not ret:
-                    ret = {}
             if fetchall == False and fetchone == True:
                 ret = cur.fetchone()
             self.mysql_cur_count += 1
             if ret:
                 return ret
+            elif fetchall == True and fetchone == False and not ret:
+                return {}
         except Exception as e:
             logging.error(e)
             while self.isMysqlConnectable() == False:
