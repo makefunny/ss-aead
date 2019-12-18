@@ -314,26 +314,7 @@ class DbTransfer(object):
     def load(self):
         return os.popen("cat /proc/loadavg | awk '{ print $1\" \"$2\" \"$3 }'").readlines()[0][:-2]
 
-    def push_db_all_user(self, test_mysql_conn=False):
-
-        if test_mysql_conn == True:
-            # logging.info('test_mysql_conn == True')
-            # wait for db connect works properly
-            test_mysql_conn_Failed = False
-            if self.isMysqlConnectable() == True:
-                # logging.info('db connectable')
-                try:
-                    conn = self.getMysqlConn()
-                    # logging.info('get mysql connection!')
-                except Exception as e:
-                    test_mysql_conn_Failed = True
-            else:
-                test_mysql_conn_Failed = True
-            if test_mysql_conn_Failed == True:
-                # logging.info('db mysql conn will retry after 30s')
-                time.sleep(30)
-                return self.push_db_all_user(test_mysql_conn = True)
-
+    def push_db_all_user(self):
         # 更新用户流量到数据库
         last_transfer = self.last_update_transfer
         curr_transfer = ServerPool.get_instance().get_servers_transfer()
@@ -356,24 +337,6 @@ class DbTransfer(object):
                 if curr_transfer[id][0] + curr_transfer[id][1] <= 0:
                     continue
                 dt_transfer[id] = [curr_transfer[id][0], curr_transfer[id][1]]
-
-        if dt_transfer and test_mysql_conn == False:
-            # logging.info('test_mysql_conn == False')
-            # wait for db connect works properly
-            test_mysql_conn_Failed = False
-            if self.isMysqlConnectable() == True:
-                # logging.info('db connectable')
-                try:
-                    conn = self.getMysqlConn()
-                    # logging.info('get mysql connection!')
-                except Exception as e:
-                    test_mysql_conn_Failed = True
-            else:
-                test_mysql_conn_Failed = True
-            if test_mysql_conn_Failed == True:
-                # logging.info('db mysql conn will retry after 30s')
-                time.sleep(30)
-                return self.push_db_all_user(test_mysql_conn = True)
 
         for id in dt_transfer.keys():
             last = last_transfer.get(id, [0, 0])
@@ -585,7 +548,7 @@ class DbTransfer(object):
         else:
             self.enable_dnsLog = True
 
-        conn = self.getMysqlConn()
+        # conn = self.getMysqlConn()
 
         query_sql = "SELECT `node_group`,`node_class`,`node_speedlimit`,`traffic_rate`,`mu_only`,`sort`,`relay_type`,`relay_to_id` FROM ss_node where `id`='" + \
                     str(self.NODE_ID) + "' AND (`node_bandwidth`<`node_bandwidth_limit` OR `node_bandwidth_limit`=0)"
@@ -593,7 +556,7 @@ class DbTransfer(object):
 
         if nodeinfo is None:
             rows = []
-            conn.commit()
+            # conn.commit()
             self.closeMysqlConn()
             logging.debug('nodeinfo is None')
             return rows
