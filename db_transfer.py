@@ -136,6 +136,8 @@ class DbTransfer(object):
             cur.execute(query_sql)
             if fetchall == True and fetchone == False:
                 ret = cur.fetchall()
+                if not ret:
+                    ret = {}
             if fetchall == False and fetchone == True:
                 ret = cur.fetchone()
             self.mysql_cur_count += 1
@@ -655,7 +657,7 @@ class DbTransfer(object):
         #     pass
         # elif get_config().PORT_GROUP == 1:
         # print('获取 mu_port')
-        mu_port_keys = ['port', 'passwd', 'method', 'protocol', 'protocol_param','obfs','obfs_param']
+        mu_port_keys = ['port', 'passwd', 'method', 'protocol', 'protocol_param', 'obfs', 'obfs_param']
         query_sql = "SELECT b.`" + '`,b.`'.join(mu_port_keys) + "`,a.`port_diff`,a.`type`" + \
                         " FROM mu_node a,mu_port b" + \
                         " WHERE a.`node_id`='" + str(self.NODE_ID) + "' AND a.`mu_port_id`=b.`id` AND a.`enable`=1 AND b.`enable`=1"
@@ -663,7 +665,7 @@ class DbTransfer(object):
         ret = self.getMysqlCur(query_sql, fetchall=True)
         # cur.execute(execute_str)
         temp = 0
-        mu_port_keys += ['port_diff','type']
+        mu_port_keys += ['port_diff', 'type']
         for r in ret:
             # print(r)
             temp_d = {}
@@ -724,7 +726,8 @@ class DbTransfer(object):
             self.relay_rule_list = {}
 
             keys_relay = ['id', 'user_id', 'des_ip']
-            keys_user_method = ['port', 'method', 'passwd', 'protocol', 'protocol_param', 'obfs', 'obfs_param']
+            keys_user_method = ['port', 'method', 'passwd', 'protocol', 'protocol_param', 'obfs', \
+                'obfs_param']
 
             # cur = conn.cursor()
             query_sql = "SELECT a.`" \
@@ -738,16 +741,16 @@ class DbTransfer(object):
             for r in ret:
                 d = {}
                 d['id'] = int(r[0])
-                d['user_id']   = int(r[1])
-                d['des_ip']    = str(r[2])
-                d['src_port']    = int(r[3])
-                d['des_port']    = int(r[4])
-                d['des_method']    = str(r[5])
-                d['des_passwd']    = str(r[6])
-                d['des_protocol']  = str(r[7])
+                d['user_id'] = int(r[1])
+                d['des_ip'] = str(r[2])
+                d['src_port'] = int(r[3])
+                d['des_port'] = int(r[4])
+                d['des_method'] = str(r[5])
+                d['des_passwd'] = str(r[6])
+                d['des_protocol'] = str(r[7])
                 d['des_protocol_param'] = str(r[8])
-                d['des_obfs']           = str(r[9])
-                d['des_obfs_param']     = str(r[10])
+                d['des_obfs'] = str(r[9])
+                d['des_obfs_param'] = str(r[10])
                 self.relay_rule_list[d['id']] = d
 
             # cur.close()
