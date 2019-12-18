@@ -8,6 +8,7 @@ import os
 import socket
 from server_pool import ServerPool
 import traceback
+from transfer_utils import *
 from shadowsocks import common, shell, lru_cache
 from configloader import load_config, get_config
 import importloader
@@ -15,28 +16,13 @@ import platform
 import datetime
 import fcntl
 from copy import copy
+import cymysql
 
 import constants
 
 switchrule = None
 db_instance = None
 
-
-def G_socket_ping(tcp_tuple = None, host = None, port = None):
-    if not tcp_tuple:
-        tcp_tuple = (host, port)
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    t_start = round(time.time() * 1000)
-    try:
-        s.settimeout(1)
-        s.connect(tcp_tuple)
-        s.shutdown(socket.SHUT_RD)
-        t_end = round(time.time() * 1000)
-        s.close()
-        return t_end - t_start
-    except Exception as e:
-        s.close()
-        return -1
 
 class DbTransfer(object):
 
@@ -81,21 +67,22 @@ class DbTransfer(object):
         self.MYSQL_PORT = get_config().MYSQL_PORT
         self.MYSQL_USER = get_config().MYSQL_USER
         self.MYSQL_PASS = get_config().MYSQL_PASS
-        self.MYSQL_DB   = get_config().MYSQL_DB
+        self.MYSQL_DB = get_config().MYSQL_DB
 
-        self.MYSQL_SSL_ENABLE   = get_config().MYSQL_SSL_ENABLE
-        self.MYSQL_SSL_CA       = get_config().MYSQL_SSL_CA
-        self.MYSQL_SSL_CERT     = get_config().MYSQL_SSL_CERT
-        self.MYSQL_SSL_KEY      = get_config().MYSQL_SSL_KEY
+        self.MYSQL_SSL_ENABLE = get_config().MYSQL_SSL_ENABLE
+        self.MYSQL_SSL_CA = get_config().MYSQL_SSL_CA
+        self.MYSQL_SSL_CERT = get_config().MYSQL_SSL_CERT
+        self.MYSQL_SSL_KEY = get_config().MYSQL_SSL_KEY
 
         self.PORT_GROUP = get_config().PORT_GROUP
         self.ENABLE_DNSLOG = get_config().ENABLE_DNSLOG
         self.NODE_ID = get_config().NODE_ID
+        self.CLOUDSAFE = get_config().CLOUDSAFE
 
         self.mysql_conn = None
+        self.mysql_cur_count = 0
 
     def getMysqlConnBase(self):
-        import cymysql
         if self.MYSQL_SSL_ENABLE == 1:
             conn = cymysql.connect(
                 host=self.MYSQL_HOST,
@@ -110,12 +97,12 @@ class DbTransfer(object):
                     'key': self.MYSQL_SSL_KEY})
         else:
             conn = cymysql.connect(
-                host    =   self.MYSQL_HOST,
-                port    =   self.MYSQL_PORT,
-                user    =   self.MYSQL_USER,
-                passwd  =   self.MYSQL_PASS,
-                db      =   self.MYSQL_DB,
-                charset =   'utf8')
+                host=self.MYSQL_HOST,
+                port=self.MYSQL_PORT,
+                user=self.MYSQL_USER,
+                passwd=self.MYSQL_PASS,
+                db=self.MYSQL_DB,
+                charset='utf8')
         conn.autocommit(True)
         return conn
 
@@ -136,33 +123,58 @@ class DbTransfer(object):
                 failed = failed + 1
         if failed == 2:
             return False
-        else:
-            return True
+        return True
+
+    def getMysqlCur(self, query_sql, fetchone=False, fetchall=False, no_result=False):
+        if self.mysql_cur_count > 3:
+            self.closeMysqlConn()
+        try:
+            ret = None
+            cur = None
+            conn = self.getMysqlConn()
+            cur = conn.cursor()
+            cur.execute(query_sql)
+            if fetchall == True and fetchone == False:
+                ret = cur.fetchall()
+            if fetchall == False and fetchone == True:
+                ret = cur.fetchone()
+            self.mysql_cur_count += 1
+            if ret:
+                return ret
+        except Exception as e:
+            logging.error(e)
+            while self.isMysqlConnectable() == False:
+                time.sleep(5)
+            self.getMysqlCur(query_sql, fetchone=fetchone, fetchall=fetchall, no_result=no_result)
+        finally:
+            if cur:
+                cur.close()
+        return None
 
     def mass_insert_traffic(self, pid, conn, dt_transfer):
-        traffic_show = self.trafficShow((dt_transfer[pid][0] +
+        traffic_show = G_traffic_show((dt_transfer[pid][0] +
                                       dt_transfer[pid][1]) *
                                      self.traffic_rate)
         # if self.port_uid_table[pid] == 1:
             # logging.info("user_id >> %d >> rate %f >> %s" % (self.port_uid_table[pid], self.traffic_rate, traffic_show))
-        cur = conn.cursor()
-        cur.execute("INSERT INTO `user_traffic_log` (`id`, `user_id`, `u`, `d`, `Node_ID`, `rate`, `traffic`, `log_time`) VALUES (NULL, '" +
-                    str(self.port_uid_table[pid]) +
-                    "', '" +
-                    str(dt_transfer[pid][0]) +
-                    "', '" +
-                    str(dt_transfer[pid][1]) +
-                    "', '" +
-                    str(self.NODE_ID) +
-                    "', '" +
-                    str(self.traffic_rate) +
-                    "', '" +
-                    traffic_show +
-                    "', unix_timestamp());")
-        cur.close()
+        # cur = conn.cursor()
+        query_sql = "INSERT INTO `user_traffic_log` (`id`, `user_id`, `u`, `d`, `Node_ID`, `rate`, `traffic`, `log_time`) VALUES (NULL, '" + \
+                    str(self.port_uid_table[pid]) + \
+                    "', '" + \
+                    str(dt_transfer[pid][0]) + \
+                    "', '" + \
+                    str(dt_transfer[pid][1]) + \
+                    "', '" + \
+                    str(self.NODE_ID) + \
+                    "', '" + \
+                    str(self.traffic_rate) + \
+                    "', '" + \
+                    traffic_show + \
+                    "', unix_timestamp());"
+        # cur.close()
+        self.getMysqlCur(query_sql, no_result=True)
 
     def update_all_user(self, dt_transfer):
-        import cymysql
         update_transfer = {}
 
         # 同一用户可有多个产品，故以产品id为线索更新流量
@@ -174,7 +186,7 @@ class DbTransfer(object):
         alive_user_count = 0
         bandwidth_thistime = 0
 
-        conn = self.getMysqlConn()
+        # conn = self.getMysqlConn()
 
         for id in dt_transfer.keys():
             if dt_transfer[id][0] == 0 and dt_transfer[id][1] == 0:
@@ -207,45 +219,30 @@ class DbTransfer(object):
                 ' END, last_use_time = unix_timestamp() ' + \
                 ' WHERE id IN (%s)' % query_sub_in
 
-            cur = conn.cursor()
-            cur.execute(query_sql)
-            cur.close()
+            self.getMysqlCur(query_sql, no_result=True)
 
-        cur = conn.cursor()
-        cur.execute(
-            "UPDATE `ss_node` SET `node_heartbeat`=unix_timestamp(),`node_bandwidth`=`node_bandwidth`+'" +
-            str(bandwidth_thistime) +
-            "' WHERE `id` = " +
-            str(
-                get_config().NODE_ID) +
-            " ; ")
-        cur.close()
+        query_sql = "UPDATE `ss_node` SET `node_heartbeat`=unix_timestamp(),`node_bandwidth`=`node_bandwidth`+'" + \
+            str(bandwidth_thistime) + \
+            "' WHERE `id` = " + str(self.NODE_ID) + " ; "
+        self.getMysqlCur(query_sql, no_result=True)
 
-        cur = conn.cursor()
-        cur.execute("INSERT INTO `ss_node_online_log` (`id`, `node_id`, `online_user`, `log_time`) VALUES (NULL, '" +
-                    str(get_config().NODE_ID) + "', '" + str(alive_user_count) + "', unix_timestamp()); ")
-        cur.close()
-
-       # cur = conn.cursor()
-       # cur.execute("INSERT INTO `ss_node_info` (`id`, `node_id`, `uptime`, `load`, `log_time`) VALUES (NULL, '" +
-       #             str(get_config().NODE_ID) + "', '" + str(self.uptime()) + "', '" + str(self.load()) + "', unix_timestamp()); ")
-       # cur.close()
+        query_sql = "INSERT INTO `ss_node_online_log` (`id`, `node_id`, `online_user`, `log_time`) VALUES (NULL, '" + \
+                    str(self.NODE_ID) + "', '" + str(alive_user_count) + "', unix_timestamp()); "
+        self.getMysqlCur(query_sql, no_result=True)
 
         online_iplist = ServerPool.get_instance().get_servers_iplist()
         for id in online_iplist.keys():
             for ip in online_iplist[id]:
-                cur = conn.cursor()
-                cur.execute("INSERT INTO `alive_ip` (`id`, `nodeid`,`userid`, `ip`, `datetime`) VALUES (NULL, '" + str(
-                    get_config().NODE_ID) + "','" + str(self.port_uid_table[id]) + "', '" + str(ip) + "', unix_timestamp())")
-                cur.close()
+                query_sql = "INSERT INTO `alive_ip` (`id`, `nodeid`,`userid`, `ip`, `datetime`) VALUES (NULL, '" + \
+                    str(self.NODE_ID) + "','" + str(self.port_uid_table[id]) + "', '" + str(ip) + "', unix_timestamp())"
+                self.getMysqlCur(query_sql, no_result=True)
 
         detect_log_list = ServerPool.get_instance().get_servers_detect_log()
         for port in detect_log_list.keys():
             for rule_id in detect_log_list[port]:
-                cur = conn.cursor()
-                cur.execute("INSERT INTO `detect_log` (`id`, `user_id`, `list_id`, `datetime`, `node_id`) VALUES (NULL, '" + str(
-                    self.port_uid_table[port]) + "', '" + str(rule_id) + "', UNIX_TIMESTAMP(), '" + str(get_config().NODE_ID) + "')")
-                cur.close()
+                query_sql = "INSERT INTO `detect_log` (`id`, `user_id`, `list_id`, `datetime`, `node_id`) VALUES (NULL, '" +  \
+                    str(self.port_uid_table[port]) + "', '" + str(rule_id) + "', UNIX_TIMESTAMP(), '" + str(get_config().NODE_ID) + "')"
+                self.getMysqlCur(query_sql, no_result=True)
 
         deny_str = ""
         if platform.system() == 'Linux' and get_config().ANTISSATTACK == 1:
@@ -279,25 +276,18 @@ class DbTransfer(object):
                     if has_match_node:
                         continue
 
-                    cur = conn.cursor()
-                    cur.execute(
-                        "SELECT * FROM `blockip` where `ip` = '" +
-                        str(realip) +
-                        "'")
-                    rows = cur.fetchone()
-                    cur.close()
+                    query_sql = "SELECT * FROM `blockip` where `ip` = '" + str(realip) + "'"
+                    rows = self.getMysqlCur(query_sql, fetchone=True)
 
                     if rows is not None:
                         continue
                     if get_config().CLOUDSAFE == 1:
-                        cur = conn.cursor()
-                        cur.execute(
-                            "INSERT INTO `blockip` (`id`, `nodeid`, `ip`, `datetime`) VALUES (NULL, '" +
-                            str(get_config().NODE_ID) +
-                            "', '" +
-                            str(realip) +
-                            "', unix_timestamp())")
-                        cur.close()
+                        query_sql = "INSERT INTO `blockip` (`id`, `nodeid`, `ip`, `datetime`) VALUES (NULL, '" + \
+                            str(self.NODE_ID) + \
+                            "', '" + \
+                            str(realip) + \
+                            "', unix_timestamp())"
+                        self.getMysqlCur(query_sql, no_result=True)
                     else:
                         if not is_ipv6:
                             os.system('route add -host %s gw 127.0.0.1' % str(realip))
@@ -306,13 +296,13 @@ class DbTransfer(object):
                             os.system('ip -6 route add ::1/128 via %s/128' % str(realip))
                             deny_str = deny_str + "\nALL: [" + str(realip) + "]/128"
 
-                        logging.info("Local Block ip:" + str(realip))
-                if get_config().CLOUDSAFE == 0:
+                        logging.info("Local Block ip:%s", str(realip))
+                if self.CLOUDSAFE == 0:
                     deny_file = open('/etc/hosts.deny', 'a')
                     fcntl.flock(deny_file.fileno(), fcntl.LOCK_EX)
                     deny_file.write(deny_str)
                     deny_file.close()
-        
+
         self.closeMysqlConn()
 
         return update_transfer
@@ -322,22 +312,9 @@ class DbTransfer(object):
             return float(f.readline().split()[0])
 
     def load(self):
-        import os
         return os.popen("cat /proc/loadavg | awk '{ print $1\" \"$2\" \"$3 }'").readlines()[0][:-2]
 
-    def trafficShow(self, Traffic):
-        if Traffic < 1024:
-            return str(round((Traffic), 2)) + "B"
-
-        if Traffic < 1024 * 1024:
-            return str(round((Traffic / 1024), 2)) + "KB"
-
-        if Traffic < 1024 * 1024 * 1024:
-            return str(round((Traffic / 1024 / 1024), 2)) + "MB"
-
-        return str(round((Traffic / 1024 / 1024 / 1024), 2)) + "GB"
-
-    def push_db_all_user(self, test_mysql_conn = False):
+    def push_db_all_user(self, test_mysql_conn=False):
 
         if test_mysql_conn == True:
             # logging.info('test_mysql_conn == True')
@@ -583,7 +560,6 @@ class DbTransfer(object):
                 logging.debug(rows[user_id])
 
     def pull_db_all_user(self):
-        import cymysql
         # 数据库所有用户信息
         if self.PORT_GROUP == 0:
             try:
@@ -596,11 +572,11 @@ class DbTransfer(object):
                     'node_speedlimit', 'forbidden_ip', 'forbidden_port', 'disconnect_ip',
                     'is_multi_user'
                 ]
-            mu_keys=copy(keys)
+            mu_keys = copy(keys)
         elif self.PORT_GROUP == 1:
             switchrule = importloader.load('switchrule')
             keys, user_method_keys = switchrule.getPortGroupKeys()['user'], switchrule.getPortGroupKeys()['user_method']
-            mu_keys=copy(keys)
+            mu_keys = copy(keys)
         else:
             raise Exception("Unknown port_group type %d" % self.PORT_GROUP)
 
@@ -611,21 +587,18 @@ class DbTransfer(object):
 
         conn = self.getMysqlConn()
 
-        cur = conn.cursor()
-        cur.execute("SELECT `node_group`,`node_class`,`node_speedlimit`,`traffic_rate`,`mu_only`,`sort`,`relay_type`,`relay_to_id` FROM ss_node where `id`='" +
-                    str(self.NODE_ID) + "' AND (`node_bandwidth`<`node_bandwidth_limit` OR `node_bandwidth_limit`=0)")
-        nodeinfo = cur.fetchone()
+        query_sql = "SELECT `node_group`,`node_class`,`node_speedlimit`,`traffic_rate`,`mu_only`,`sort`,`relay_type`,`relay_to_id` FROM ss_node where `id`='" + \
+                    str(self.NODE_ID) + "' AND (`node_bandwidth`<`node_bandwidth_limit` OR `node_bandwidth_limit`=0)"
+        nodeinfo = self.getMysqlCur(query_sql, fetchone=True)
 
         if nodeinfo is None:
             rows = []
-            cur.close()
             conn.commit()
             self.closeMysqlConn()
             logging.debug('nodeinfo is None')
             return rows
 
         logging.debug(nodeinfo)
-        cur.close()
 
         self.node_speedlimit = float(nodeinfo[2])
         self.traffic_rate = float(nodeinfo[3])
@@ -639,24 +612,21 @@ class DbTransfer(object):
         self.relay_type = int(nodeinfo[6])
         self.relay_to_id = int(nodeinfo[7])
         if self.relay_type == constants.RELAY_USER_METHOD:
-            cur = conn.cursor()
-            execute_str = "SELECT b.`ip` as ip,a.`port` as port,a.`method` as method,a.`passwd` as passwd,a.`protocol` as protocol,a.`protocol_param` as protocol_param,a.`obfs` as obfs,a.`obfs_param` as obfs_param" \
+            query_sql = "SELECT b.`ip` as ip,a.`port` as port,a.`method` as method,a.`passwd` as passwd,a.`protocol` as protocol,a.`protocol_param` as protocol_param,a.`obfs` as obfs,a.`obfs_param` as obfs_param" \
             + " FROM user_method a,ddns b where a.`id`=" + str(self.relay_to_id) + " AND a.ddns_id=b.id"
-            logging.debug(execute_str)
-            cur.execute(execute_str)
-            relay_to_um = cur.fetchone()
-            logging.debug(relay_to_um)
+            relay_to_um = self.getMysqlCur(query_sql, fetchone=True)
+            # logging.debug(relay_to_um)
             if relay_to_um:
-                logging.debug(relay_to_um)
+                # logging.debug(relay_to_um)
                 d = {}
-                d['des_ip']    = str(relay_to_um[0])
-                d['des_port']    = int(relay_to_um[1])
-                d['des_method']    = str(relay_to_um[2])
-                d['des_passwd']    = str(relay_to_um[3])
-                d['des_protocol']  = str(relay_to_um[4])
+                d['des_ip'] = str(relay_to_um[0])
+                d['des_port'] = int(relay_to_um[1])
+                d['des_method'] = str(relay_to_um[2])
+                d['des_passwd'] = str(relay_to_um[3])
+                d['des_protocol'] = str(relay_to_um[4])
                 d['des_protocol_param'] = str(relay_to_um[5])
-                d['des_obfs']           = str(relay_to_um[6])
-                d['des_obfs_param']     = str(relay_to_um[7])
+                d['des_obfs'] = str(relay_to_um[6])
+                d['des_obfs_param'] = str(relay_to_um[7])
                 self.common_relay_rule = d
 
         # 获取 is_multi_use=0 的用户
@@ -668,14 +638,13 @@ class DbTransfer(object):
             #     node_group_sql = "AND `node_group`=" + str(nodeinfo[0])
             import port_range
             port_mysql_str = port_range.getPortRangeMysqlStr()
-            cur = conn.cursor()
-            execute_str = "SELECT a." + ',a.'.join(keys) + ",c.traffic_flow as transfer_enable,c.traffic_flow_used_up as u,c.traffic_flow_used_dl as d,c.id as productid" + \
+            query_sql = "SELECT a." + ',a.'.join(keys) + ",c.traffic_flow as transfer_enable,c.traffic_flow_used_up as u,c.traffic_flow_used_dl as d,c.id as productid" + \
                 " FROM user a,user_product_traffic c" + \
                 " WHERE a.`is_multi_user`=0 AND a.`enable`=1 AND a.`expire_in`>now()" + \
                 " AND a.`id`=c.`user_id` AND c.`status`=2 AND (c.`expire_time`=-1 OR c.`expire_time`>unix_timestamp())" + \
                 " AND (c.`traffic_flow`>c.`traffic_flow_used_up`+c.`traffic_flow_used_dl` OR c.`traffic_flow`=-1) AND c.`node_group`=" + str(nodeinfo[0]) + \
                 port_mysql_str
-            cur.execute(execute_str)
+            ret = self.getMysqlCur(query_sql, fetchall=True)
         elif self.PORT_GROUP == 1:
             # if nodeinfo[0] == 0:
             #     node_group_sql = ""
@@ -684,21 +653,19 @@ class DbTransfer(object):
             import port_range
             port_mysql_str = port_range.getPortRangeMysqlStrForPortGroup()
             # logging.debug(port_mysql_str)
-            cur = conn.cursor()
-            execute_str = "SELECT a.`" + '`,a.`'.join(keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
+            query_sql = "SELECT a.`" + '`,a.`'.join(keys) + "`,b.`" + '`,b.`'.join(user_method_keys) + \
                 "`,c.traffic_flow as transfer_enable,c.traffic_flow_used_up as u,c.traffic_flow_used_dl as d,c.id as productid" + \
                 " FROM user a,user_method b,user_product_traffic c" + \
                 " WHERE a.`is_multi_user`=0 AND a.`enable`=1 AND a.`expire_in`>now() " + \
                 "AND a.`id`=b.`user_id` AND b.`node_id`='" + str(self.NODE_ID) + "' " + \
                 "AND a.`id`=c.`user_id` AND c.`status`=2 AND (c.`expire_time`=-1 OR c.`expire_time`>unix_timestamp()) AND (c.`traffic_flow`>c.`traffic_flow_used_up`+c.`traffic_flow_used_dl` OR c.`traffic_flow`=-1) AND c.`node_group`=" + str(nodeinfo[0]) + \
                 port_mysql_str
-            cur.execute(execute_str)
-            # logging.debug(execute_str)
+            ret = self.getMysqlCur(query_sql, fetchall=True)
             keys += user_method_keys
         # 按顺序来
         keys += ['transfer_enable', 'u', 'd', 'productid']
         rows = []
-        for r in cur.fetchall():
+        for r in ret:
             d = {}
             for column in range(len(keys)):
                 d[keys[column]] = r[column]
@@ -709,8 +676,8 @@ class DbTransfer(object):
             # self.pull_db_all_user_debug(d)
 
             rows.append(d)
-        cur.close()
-        cur = conn.cursor()
+        # cur.close()
+        # cur = conn.cursor()
         # logging.debug(len(rows))
         # print(rows)
         # print('keys', keys)
@@ -725,15 +692,16 @@ class DbTransfer(object):
         #     pass
         # elif get_config().PORT_GROUP == 1:
         # print('获取 mu_port')
-        mu_port_keys = ['port','passwd','method','protocol','protocol_param','obfs','obfs_param']
-        execute_str =   "SELECT b.`" + '`,b.`'.join(mu_port_keys) + "`,a.`port_diff`,a.`type`" + \
+        mu_port_keys = ['port', 'passwd', 'method', 'protocol', 'protocol_param','obfs','obfs_param']
+        query_sql = "SELECT b.`" + '`,b.`'.join(mu_port_keys) + "`,a.`port_diff`,a.`type`" + \
                         " FROM mu_node a,mu_port b" + \
                         " WHERE a.`node_id`='" + str(self.NODE_ID) + "' AND a.`mu_port_id`=b.`id` AND a.`enable`=1 AND b.`enable`=1"
         # logging.debug(execute_str)
-        cur.execute(execute_str)
+        ret = self.getMysqlCur(query_sql, fetchall=True)
+        # cur.execute(execute_str)
         temp = 0
         mu_port_keys += ['port_diff','type']
-        for r in cur.fetchall():
+        for r in ret:
             # print(r)
             temp_d = {}
             # d = {}
@@ -767,43 +735,44 @@ class DbTransfer(object):
             #     d['productid'] = -1
             #     print('d',d)
             #     rows.append(d)
-        cur.close()
+        # cur.close()
         # print(rows)
 
         # 读取节点IP
         # SELECT * FROM `ss_node`  where `node_ip` != ''
         self.node_ip_list = []
-        cur = conn.cursor()
-        cur.execute("SELECT `node_ip` FROM `ss_node`  where `node_ip` != ''")
-        for r in cur.fetchall():
+        # cur = conn.cursor()
+        ret = self.getMysqlCur(query_sql, fetchall=True)
+        # cur.execute("SELECT `node_ip` FROM `ss_node`  where `node_ip` != ''")
+        for r in ret:
             temp_list = str(r[0]).split(',')
             self.node_ip_list.append(temp_list[0])
-        cur.close()
+        # cur.close()
 
         self.set_detect_rule_list()
-        self.closeMysqlConn()
+        # self.closeMysqlConn()
 
         # 读取中转规则，如果是中转节点的话
 
         if self.is_relay and self.relay_type != constants.RELAY_USER_METHOD:
             # 为什么必须close才能继续execute？
             # 否则cymysql报错socket not found
-            conn = self.getMysqlConn()
-            self.relay_rule_list    = {}
+            # conn = self.getMysqlConn()
+            self.relay_rule_list = {}
 
-            keys_relay       = ['id', 'user_id', 'des_ip']
+            keys_relay = ['id', 'user_id', 'des_ip']
             keys_user_method = ['port', 'method', 'passwd', 'protocol', 'protocol_param', 'obfs', 'obfs_param']
 
-            cur = conn.cursor()
-            execute_str = "SELECT a.`" \
+            # cur = conn.cursor()
+            query_sql = "SELECT a.`" \
                         + '`,a.`'.join(keys_relay) + "`, c.`port`, b.`" \
                         + '`,b.`'.join(keys_user_method) \
                         + "` FROM relay a,user_method b,user_method c WHERE a.`src_node_id` = " + str(self.NODE_ID) \
                         + " AND a.`des_user_method_id` = b.`id` AND a.`src_user_method_id` = c.`id` AND a.`is_user_method_same` = 0 AND a.`enable` = 1"
-            logging.debug(execute_str)
-            cur.execute(execute_str)
-
-            for r in cur.fetchall():
+            # logging.debug(query_sql)
+            # cur.execute(execute_str)
+            ret = self.getMysqlCur(query_sql, fetchall=True)
+            for r in ret:
                 d = {}
                 d['id'] = int(r[0])
                 d['user_id']   = int(r[1])
@@ -818,9 +787,9 @@ class DbTransfer(object):
                 d['des_obfs_param']     = str(r[10])
                 self.relay_rule_list[d['id']] = d
 
-            cur.close()
+            # cur.close()
 
-            self.closeMysqlConn()
+            # self.closeMysqlConn()
         return rows
 
     def cmp(self, val1, val2):
@@ -1017,7 +986,7 @@ class DbTransfer(object):
             elif self.relay_type == constants.RELAY_USER_METHOD:
                 cfg['relay_rules'] = {}
                 cfg['common_relay_rule'] = self.common_relay_rule
-                logging.debug(self.common_relay_rule)
+                # logging.debug(self.common_relay_rule)
             elif self.relay_type == constants.RELAY_NO:
                 temp_relay_rules = {}
                 cfg['relay_rules'] = temp_relay_rules.copy()
@@ -1229,7 +1198,7 @@ class DbTransfer(object):
                 # waiting for stop signal
                 # stop => signal is True
                 # continue => signal is False
-                if db_instance.event.wait(60) or not db_instance.is_all_thread_alive():
+                if db_instance.event.wait(5) or not db_instance.is_all_thread_alive():
                     break
                 # logging.info('if db_instance.has_stopped:')
                 if db_instance.has_stopped:
