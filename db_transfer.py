@@ -148,6 +148,7 @@ class DbTransfer(object):
             logging.error(e)
             while self.isMysqlConnectable() == False:
                 time.sleep(5)
+            time.sleep(5)
             self.getMysqlCur(query_sql, fetchone=fetchone, fetchall=fetchall, no_result=no_result)
         finally:
             if cur:
