@@ -81,6 +81,7 @@ class DbTransfer(object):
 
         self.mysql_conn = None
         self.mysql_cur_count = 0
+        self.mysql_err_sleep = 10
 
     def getMysqlConnBase(self):
         if self.MYSQL_SSL_ENABLE == 1:
@@ -146,9 +147,12 @@ class DbTransfer(object):
                 return {}
         except Exception as e:
             logging.error(e)
+            tcp_sleep = 5
             while self.isMysqlConnectable() == False:
-                time.sleep(5)
-            time.sleep(5)
+                tcp_sleep += tcp_sleep
+                time.sleep(tcp_sleep)
+            time.sleep(self.mysql_err_sleep)
+            self.mysql_err_sleep += self.mysql_err_sleep
             return self.getMysqlCur(query_sql, fetchone=fetchone, fetchall=fetchall, no_result=no_result)
         finally:
             if cur:
