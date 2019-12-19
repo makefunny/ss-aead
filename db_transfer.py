@@ -126,8 +126,9 @@ class DbTransfer(object):
         return True
 
     def getMysqlCur(self, query_sql, fetchone=False, fetchall=False, no_result=False):
-        if self.mysql_cur_count > 3:
+        if self.mysql_cur_count > 5:
             self.closeMysqlConn()
+            self.mysql_cur_count = 0
         try:
             ret = None
             cur = None
