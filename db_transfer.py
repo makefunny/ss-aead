@@ -131,6 +131,7 @@ class DbTransfer(object):
             self.closeMysqlConn()
             self.mysql_cur_count = 0
         try:
+            self.mysql_err_sleep = 10
             ret = None
             cur = None
             conn = self.getMysqlConn()
