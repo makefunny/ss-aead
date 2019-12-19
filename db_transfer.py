@@ -148,6 +148,7 @@ class DbTransfer(object):
                 return {}
         except Exception as e:
             logging.error(e)
+            logging.error(query_sql)
             tcp_sleep = 5
             while self.isMysqlConnectable() == False:
                 tcp_sleep += tcp_sleep
