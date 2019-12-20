@@ -80,7 +80,6 @@ class DbTransfer(object):
         self.CLOUDSAFE = get_config().CLOUDSAFE
 
         self.mysql_conn = None
-        self.mysql_cur_count = 0
         self.mysql_err_sleep = 10
 
     def getMysqlConnBase(self):
@@ -114,7 +113,12 @@ class DbTransfer(object):
 
     def closeMysqlConn(self):
         if self.mysql_conn is not None:
-            self.mysql_conn.close()
+            logging.debug("close mysql conn")
+            self.mysql_err_sleep = 10
+            try:
+                self.mysql_conn.close()
+            except:
+                pass
             self.mysql_conn = None
 
     def isMysqlConnectable(self):
@@ -126,48 +130,63 @@ class DbTransfer(object):
             return False
         return True
 
+    def waitForMysqlConnectable(self):
+        tcp_sleep = 5
+        while self.isMysqlConnectable() is False:
+            tcp_sleep += tcp_sleep
+            time.sleep(tcp_sleep)
+
     def getMysqlCur(self, query_sql, fetchone=False, fetchall=False, no_result=False):
-        if self.mysql_cur_count > 5:
-            self.closeMysqlConn()
-            self.mysql_cur_count = 0
-            self.mysql_err_sleep = 10
         try:
             ret = None
             cur = None
             conn = self.getMysqlConn()
             cur = conn.cursor()
             cur.execute(query_sql)
-            if fetchall == True and fetchone == False:
+            if fetchall is True and fetchone is False:
                 ret = cur.fetchall()
-            if fetchall == False and fetchone == True:
+            if fetchall is False and fetchone is True:
                 ret = cur.fetchone()
-            self.mysql_cur_count += 1
             if ret:
                 return ret
-            elif fetchall == True and fetchone == False and not ret:
+            if fetchall is True and fetchone is False:
                 return {}
         except Exception as e:
             logging.error(e)
             logging.error(query_sql)
-            tcp_sleep = 5
-            while self.isMysqlConnectable() == False:
-                tcp_sleep += tcp_sleep
-                time.sleep(tcp_sleep)
+            # print(e.errmsg, type(e.errmsg), isinstance(e.errmsg, BrokenPipeError))
+            print(e, type(e), isinstance(e, ConnectionAbortedError), isinstance(e.errmsg, ConnectionAbortedError))
+
+            # BrokenPipeError 无法直接catch
+            if isinstance(e.errmsg, BrokenPipeError) or isinstance(e.errmsg, ConnectionAbortedError):
+                self.waitForMysqlConnectable()
+                time.sleep(self.mysql_err_sleep)
+                self.closeMysqlConn()
+
+                if cur:
+                    cur.close()
+                return self.getMysqlCur(
+                    query_sql,
+                    fetchone=fetchone,
+                    fetchall=fetchall,
+                    no_result=no_result)
+
+            self.waitForMysqlConnectable()
             time.sleep(self.mysql_err_sleep)
-            self.mysql_err_sleep += self.mysql_err_sleep
-            return self.getMysqlCur(query_sql, fetchone=fetchone, fetchall=fetchall, no_result=no_result)
-        finally:
+            self.mysql_err_sleep += 10
+
             if cur:
                 cur.close()
+            return self.getMysqlCur(
+                query_sql,
+                fetchone=fetchone,
+                fetchall=fetchall,
+                no_result=no_result)
         return None
 
     def mass_insert_traffic(self, pid, dt_transfer):
-        traffic_show = G_traffic_show((dt_transfer[pid][0] +
-                                      dt_transfer[pid][1]) *
-                                     self.traffic_rate)
-        # if self.port_uid_table[pid] == 1:
-            # logging.info("user_id >> %d >> rate %f >> %s" % (self.port_uid_table[pid], self.traffic_rate, traffic_show))
-        # cur = conn.cursor()
+        traffic_show = G_traffic_show(
+            (dt_transfer[pid][0] + dt_transfer[pid][1]) * self.traffic_rate)
         query_sql = "INSERT INTO `user_traffic_log` (`id`, `user_id`, `u`, `d`, `Node_ID`, `rate`, `traffic`, `log_time`) VALUES (NULL, '" + \
                     str(self.port_uid_table[pid]) + \
                     "', '" + \
@@ -181,10 +200,10 @@ class DbTransfer(object):
                     "', '" + \
                     traffic_show + \
                     "', unix_timestamp());"
-        # cur.close()
         self.getMysqlCur(query_sql, no_result=True)
 
     def update_all_user(self, dt_transfer):
+        self.closeMysqlConn()
         update_transfer = {}
 
         # 同一用户可有多个产品，故以产品id为线索更新流量
@@ -207,9 +226,11 @@ class DbTransfer(object):
                 continue
 
             query_sub_when += ' WHEN %s THEN traffic_flow_used_up+%s' % (
-                self.uid_productid_table[self.port_uid_table[id]], dt_transfer[id][0] * self.traffic_rate)
+                self.uid_productid_table[self.port_uid_table[id]],
+                dt_transfer[id][0] * self.traffic_rate)
             query_sub_when2 += ' WHEN %s THEN traffic_flow_used_dl+%s' % (
-                self.uid_productid_table[self.port_uid_table[id]], dt_transfer[id][1] * self.traffic_rate)
+                self.uid_productid_table[self.port_uid_table[id]],
+                dt_transfer[id][1] * self.traffic_rate)
             update_transfer[id] = dt_transfer[id]
 
             alive_user_count = alive_user_count + 1
@@ -251,13 +272,13 @@ class DbTransfer(object):
         for port in detect_log_list.keys():
             for rule_id in detect_log_list[port]:
                 query_sql = "INSERT INTO `detect_log` (`id`, `user_id`, `list_id`, `datetime`, `node_id`) VALUES (NULL, '" +  \
-                    str(self.port_uid_table[port]) + "', '" + str(rule_id) + "', UNIX_TIMESTAMP(), '" + str(get_config().NODE_ID) + "')"
+                    str(self.port_uid_table[port]) + "', '" + str(rule_id) + "', UNIX_TIMESTAMP(), '" + str(self.NODE_ID) + "')"
                 self.getMysqlCur(query_sql, no_result=True)
 
         deny_str = ""
         if platform.system() == 'Linux' and get_config().ANTISSATTACK == 1:
             wrong_iplist = ServerPool.get_instance().get_servers_wrong()
-            server_ip = socket.gethostbyname(get_config().MYSQL_HOST)
+            server_ip = socket.gethostbyname(self.MYSQL_HOST)
             for id in wrong_iplist.keys():
                 for ip in wrong_iplist[id]:
                     realip = ""
@@ -313,8 +334,6 @@ class DbTransfer(object):
                     deny_file.write(deny_str)
                     deny_file.close()
 
-        self.closeMysqlConn()
-
         return update_transfer
 
     def uptime(self):
@@ -357,17 +376,16 @@ class DbTransfer(object):
         self.update_all_user(dt_transfer)
 
     def set_detect_rule_list(self):
-        conn = self.getMysqlConn()
         # 读取审计规则,数据包匹配部分
         keys_detect = ['id', 'regex', 'match_filed']
 
-        cur = conn.cursor()
-        cur.execute("SELECT " + ','.join(keys_detect) +
-                    " FROM detect_list WHERE `type` = 1 AND `match_filed` = 0")
+        query_sql = "SELECT " + ','.join(keys_detect) + \
+                    " FROM detect_list WHERE `type` = 1 AND `match_filed` = 0"
+        ret = self.getMysqlCur(query_sql, fetchall=True)
 
         exist_id_list = []
 
-        for r in cur.fetchall():
+        for r in ret:
             id = int(r[0])
             exist_id_list.append(id)
             # add new rule
@@ -398,15 +416,12 @@ class DbTransfer(object):
         for id in deleted_id_list:
             del self.detect_text_list_all[id]
 
-        cur.close()
-
-        cur = conn.cursor()
-        cur.execute("SELECT " + ','.join(keys_detect) +
-                    " FROM detect_list WHERE `type` = 2 AND `match_filed` = 0" )
-
+        query_sql = "SELECT " + ','.join(keys_detect) + \
+                    " FROM detect_list WHERE `type` = 2 AND `match_filed` = 0"
+        ret = self.getMysqlCur(query_sql, fetchall=True)
         exist_id_list = []
 
-        for r in cur.fetchall():
+        for r in ret:
             id = int(r[0])
             exist_id_list.append(id)
             if r[0] not in self.detect_hex_list_all:
@@ -435,13 +450,13 @@ class DbTransfer(object):
         for id in deleted_id_list:
             del self.detect_hex_list_all[id]
 
-        cur = conn.cursor()
-        cur.execute("SELECT " + ','.join(keys_detect) +
-                    " FROM detect_list where `type` = 1 AND `match_filed` = 1")
+        query_sql = "SELECT " + ','.join(keys_detect) + \
+                    " FROM detect_list where `type` = 1 AND `match_filed` = 1"
+        ret = self.getMysqlCur(query_sql, fetchall=True)
 
         exist_id_list = []
 
-        for r in cur.fetchall():
+        for r in ret:
             id = int(r[0])
             exist_id_list.append(id)
             # add new rule
@@ -475,15 +490,12 @@ class DbTransfer(object):
             logging.debug('del self.detect_text_list_dns[id]')
             del self.detect_text_list_dns[id]
 
-        cur.close()
-
-        cur = conn.cursor()
-        cur.execute("SELECT " + ','.join(keys_detect) +
-                    " FROM detect_list WHERE `type` = 2 AND `match_filed` = 1" )
-
+        query_sql = "SELECT " + ','.join(keys_detect) + \
+                    " FROM detect_list where `type` = 2 AND `match_filed` = 1"
+        ret = self.getMysqlCur(query_sql, fetchall=True)
         exist_id_list = []
 
-        for r in cur.fetchall():
+        for r in ret:
             id = int(r[0])
             exist_id_list.append(id)
             if r[0] not in self.detect_hex_list_dns:
@@ -511,9 +523,6 @@ class DbTransfer(object):
 
         for id in deleted_id_list:
             del self.detect_hex_list_dns[id]
-
-        cur.close()
-        self.closeMysqlConn()
 
     def reset_detect_rule_status(self):
         self.detect_text_all_ischanged = False
@@ -566,8 +575,6 @@ class DbTransfer(object):
 
         if nodeinfo is None:
             rows = []
-            # conn.commit()
-            self.closeMysqlConn()
             logging.debug('nodeinfo is None')
             return rows
 
@@ -723,7 +730,6 @@ class DbTransfer(object):
         # cur.close()
 
         self.set_detect_rule_list()
-        # self.closeMysqlConn()
 
         # 读取中转规则，如果是中转节点的话
 
@@ -763,7 +769,6 @@ class DbTransfer(object):
 
             # cur.close()
 
-            # self.closeMysqlConn()
         return rows
 
     def cmp(self, val1, val2):
@@ -1163,6 +1168,7 @@ class DbTransfer(object):
                     db_instance.del_server_out_of_bound_safe(last_rows, rows)
                     db_instance.reset_detect_rule_status()
                     last_rows = rows
+                    db_instance.closeMysqlConn()
                     # logging.info('try end')
                 except Exception as e:
                     trace = traceback.format_exc()
@@ -1172,7 +1178,7 @@ class DbTransfer(object):
                 # waiting for stop signal
                 # stop => signal is True
                 # continue => signal is False
-                if db_instance.event.wait(60) or not db_instance.is_all_thread_alive():
+                if db_instance.event.wait(6) or not db_instance.is_all_thread_alive():
                     break
                 # logging.info('if db_instance.has_stopped:')
                 if db_instance.has_stopped:
