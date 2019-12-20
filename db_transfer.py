@@ -200,7 +200,7 @@ class DbTransfer(object):
 
             self.waitForMysqlConnectable()
             time.sleep(self.mysql_err_sleep)
-            # self.mysql_err_sleep += 10
+            self.mysql_err_sleep += 10
 
             if cur:
                 cur.close()
@@ -1205,7 +1205,7 @@ class DbTransfer(object):
                 # waiting for stop signal
                 # stop => signal is True
                 # continue => signal is False
-                if db_instance.event.wait(6) or not db_instance.is_all_thread_alive():
+                if db_instance.event.wait(60) or not db_instance.is_all_thread_alive():
                     break
                 # logging.info('if db_instance.has_stopped:')
                 if db_instance.has_stopped:
