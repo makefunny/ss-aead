@@ -175,6 +175,7 @@ class DbTransfer(object):
             # print(e.errmsg, type(e.errmsg), isinstance(e.errmsg, BrokenPipeError)) 
             # print(e, type(e), isinstance(e, ConnectionAbortedError), isinstance(e.errmsg, ConnectionAbortedError))
 
+
             # BrokenPipeError 无法直接catch
             if isinstance(e.errmsg, BrokenPipeError) or isinstance(e.errmsg, ConnectionAbortedError):
                 self.waitForMysqlConnectable()
