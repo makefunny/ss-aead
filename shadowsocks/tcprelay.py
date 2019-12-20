@@ -1589,79 +1589,108 @@ class TCPRelayHandler(object):
                                 logging.error('host is None')
                                 is_Failed = True
                         else:
-                            if self._server._config["is_multi_user"] == CONSTANTS.is_multi_user_PROTOCOL and self._current_user_id == 0:
-                                pass
                             logging.debug("no host match")
 
-
-                        is_relay = self.is_match_relay_rule_mu()
-                        if not is_relay:
-                            if need_sendback:
-                                data_sendback = self._obfs.server_encode(b'')
-                                try:
-                                    logging.debug("data_sendback")
-                                    self._write_to_sock(data_sendback, self._local_sock)
-                                except Exception as e:
-                                    shell.print_exception(e)
-                                    if self._config['verbose']:
-                                        traceback.print_exc()
-                                    logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
-                                    self.destroy()
-                                    return
+                        try:
+                            # 协议式 decode
+                            if self._server._config["protocol"] == b"auth_simple":
+                                if self._server._config["is_multi_user"] == CONSTANTS.is_multi_user_PROTOCOL_AUTH_SIMPLE:
+                                    data, sendback, uid = self._protocol.server_post_decrypt(data)
+                                    self._update_user(uid)
+                                else:
+                                    is_Failed = True
+                                    raise Exception('auth_simple is used for multi-user(type 3) only, but the type is:%d' % self._server._config["is_multi_user"])
                             else:
+                                # 默认注入了 update_user_func
+                                data, sendback = self._protocol.server_post_decrypt(data)
+                                if self._server._config["protocol"] != b"origin":
+                                    logging.debug("final >> protocol decrypted data >> %d %s" % (len(data), data))
 
-                                try:
-                                    # 协议式 decode
-                                    if self._server._config["protocol"] == b"auth_simple":
-                                        if self._server._config["is_multi_user"] == CONSTANTS.is_multi_user_PROTOCOL_AUTH_SIMPLE:
-                                            data, sendback, uid = self._protocol.server_post_decrypt(data)
-                                            self._update_user(uid)
-                                        else:
-                                            is_Failed = True
-                                            raise Exception('auth_simple is used for multi-user(type 3) only, but the type is:%d' % self._server._config["is_multi_user"])
-                                    else:
-                                        # 默认注入了 update_user_func
-                                        data, sendback  = self._protocol.server_post_decrypt(data)
-                                        if self._server._config["protocol"] != b"origin":
-                                            logging.debug("final >> protocol decrypted data >> %d %s" % (len(data), data))
+                            # logging.info('%d %d %d %s' % (self._server._config["is_multi_user"], self._current_user_id, self._stage, data))
 
-                                    # logging.info('%d %d %d %s' % (self._server._config["is_multi_user"], self._current_user_id, self._stage, data))
+                            # 协议式 didn't get user
+                            if self._server._config["is_multi_user"] == CONSTANTS.is_multi_user_PROTOCOL and self._current_user_id == 0:
+                                is_Failed = True
+                                if data:
+                                    raise Exception(
+                                        'The port is for multi-user only , but the key remote provided is error or empty, so The connection has been rejected, when connect from %s:%d via port %d' %
+                                        (self._client_address[0], self._client_address[1], self._server._listen_port))
+                                # else:
+                                #     raise Exception(
+                                #         'The port is for multi-user only , but the key remote provided is error or empty, and the data is "", when connect from %s:%d via port %d' %
+                                #         (self._client_address[0], self._client_address[1], self._server._listen_port))
 
-                                    # 协议式 didn't get user
-                                    if self._server._config["is_multi_user"] == CONSTANTS.is_multi_user_PROTOCOL and self._current_user_id == 0:
-                                        is_Failed = True
-                                        if data:
-                                            raise Exception(
-                                                'The port is for multi-user only , but the key remote provided is error or empty, so The connection has been rejected, when connect from %s:%d via port %d' %
-                                                (self._client_address[0], self._client_address[1], self._server._listen_port))
-                                        # else:
-                                        #     raise Exception(
-                                        #         'The port is for multi-user only , but the key remote provided is error or empty, and the data is "", when connect from %s:%d via port %d' %
-                                        #         (self._client_address[0], self._client_address[1], self._server._listen_port))
+                            if self._server._config["is_multi_user"] == CONSTANTS.is_multi_user_PROTOCOL and self._current_user_id == 0 and ogn_data:
+                                self._header_buf = ogn_data[:]
 
-                                    if self._server._config["is_multi_user"] == CONSTANTS.is_multi_user_PROTOCOL and self._current_user_id == 0 and ogn_data:
-                                        self._header_buf = ogn_data[:]
+                            if self._server._config["is_multi_user"] == CONSTANTS.is_multi_user_PROTOCOL and self._current_user_id == 0 and \
+                                (self._server._config["obfs"] == b"tls1.2_ticket_auth" or self._server._config["obfs"] == b"tls1.2_ticket_fastauth" or self._server._config["obfs"] == b"tls1.simple_obfs_tls"):
+                                is_Failed = False
 
-                                    if not is_relay and sendback:
-                                        logging.debug("sendback")
-                                        backdata = self._protocol.server_pre_encrypt(b'')
-                                        backdata = self._encryptor.encrypt(backdata)
-                                        backdata = self._obfs.server_encode(backdata)
-                                        logging.debug("backdata >> %s" % backdata)
-                                        try:
-                                            self._write_to_sock(backdata, self._local_sock)
-                                        except Exception as e:
-                                            shell.print_exception(e)
-                                            if self._config['verbose']:
-                                                traceback.print_exc()
-                                            logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
-                                            self.destroy()
-                                            return
+                            is_relay = self.is_match_relay_rule_mu()
+                            if not is_relay:
+                                #没有中转
+                                if need_sendback:
+                                    logging.debug("need_sendback")
+                                    data_sendback = self._obfs.server_encode(b'')
+                                    try:
+                                        logging.debug("data_sendback")
+                                        self._write_to_sock(data_sendback, self._local_sock)
+                                    except Exception as e:
+                                        shell.print_exception(e)
+                                        if self._config['verbose']:
+                                            traceback.print_exc()
+                                        logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
+                                        self.destroy()
+                                        return
+                                if sendback:
+                                    logging.debug("sendback")
+                                    backdata = self._protocol.server_pre_encrypt(b'')
+                                    backdata = self._encryptor.encrypt(backdata)
+                                    backdata = self._obfs.server_encode(backdata)
+                                    logging.debug("backdata >> %s" % backdata)
+                                    try:
+                                        self._write_to_sock(backdata, self._local_sock)
+                                    except Exception as e:
+                                        shell.print_exception(e)
+                                        if self._config['verbose']:
+                                            traceback.print_exc()
+                                        logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
+                                        self.destroy()
+                                        return
+                            else:
+                                if need_sendback:
+                                    data_sendback = self._obfs.server_encode(b'')
+                                    try:
+                                        logging.debug("need_sendback")
+                                        self._write_to_sock(data_sendback, self._local_sock)
+                                    except Exception as e:
+                                        shell.print_exception(e)
+                                        if self._config['verbose']:
+                                            traceback.print_exc()
+                                        logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
+                                        self.destroy()
+                                        return
+                                # if sendback:
+                                #     logging.debug("sendback")
+                                #     backdata = self._protocol.server_pre_encrypt(b'')
+                                #     backdata = self._encryptor.encrypt(backdata)
+                                #     backdata = self._obfs.server_encode(backdata)
+                                #     logging.debug("backdata >> %s" % backdata)
+                                #     try:
+                                #         self._write_to_sock(backdata, self._local_sock)
+                                #     except Exception as e:
+                                #         shell.print_exception(e)
+                                #         if self._config['verbose']:
+                                #             traceback.print_exc()
+                                #         logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
+                                #         self.destroy()
+                                #         return
 
-                                except Exception as e:
-                                    shell.print_exception(e)
-                                    logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
-                                    self.destroy()
+                        except Exception as e:
+                            shell.print_exception(e)
+                            logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
+                            self.destroy()
 
                         if is_Failed:
                             data = self._handel_mu_protocol_error(self._client_address, ogn_data)
@@ -1817,6 +1846,7 @@ class TCPRelayHandler(object):
                         try:
                             # logging.debug(self._obfss)
                             obfs_decode = self._obfss[self._current_user_id].client_decode(data)
+                            logging.debug(obfs_decode)
                         except Exception as e:
                             shell.print_exception(e)
                             logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
@@ -1830,6 +1860,8 @@ class TCPRelayHandler(object):
                             iv_len = len(self._protocols[self._current_user_id].obfs.server_info.iv)
                             self._protocols[self._current_user_id].obfs.server_info.recv_iv = obfs_decode[0][:iv_len]
                         data = obfs_decode[0]
+
+
                         logging.debug("data           >> %d %s" % (len(data), data))
                         data = self._encryptors[self._current_user_id].decrypt(data)
                         logging.debug("data decrypted >> %d %s" % (len(data), data))
@@ -1884,6 +1916,8 @@ class TCPRelayHandler(object):
                         try:
                             # logging.debug(self._obfss)
                             obfs_decode = self._obfss[self._current_user_id].client_decode(data)
+                            # logging.debug(obfs_decode)
+
                         except Exception as e:
                             shell.print_exception(e)
                             logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
@@ -1891,8 +1925,9 @@ class TCPRelayHandler(object):
                             return
                         # logging.debug("data           >> %d %s" % (len(data), data))
                         if obfs_decode[1]:
-                            send_back = self._obfs.client_encode(b'')
+                            send_back = self._obfss[self._current_user_id].client_encode(b'')
                             self._write_to_sock(send_back, self._remote_sock)
+                            return
                         if not self._protocols[self._current_user_id].obfs.server_info.recv_iv:
                             iv_len = len(self._protocols[self._current_user_id].obfs.server_info.iv)
                             self._protocols[self._current_user_id].obfs.server_info.recv_iv = obfs_decode[0][:iv_len]
@@ -1921,8 +1956,9 @@ class TCPRelayHandler(object):
                             return
                         # logging.debug("data           >> %d %s" % (len(data), data))
                         if obfs_decode[1]:
-                            send_back = self._obfs.client_encode(b'')
+                            send_back = self._obfss[self._current_user_id].client_encode(b'')
                             self._write_to_sock(send_back, self._remote_sock)
+                            return
                         if not self._des_common_protocol.obfs.server_info.recv_iv:
                             iv_len = len(self._des_common_protocol.obfs.server_info.iv)
                             self._des_common_protocol.obfs.server_info.recv_iv = obfs_decode[0][:iv_len]
@@ -1941,39 +1977,6 @@ class TCPRelayHandler(object):
                             return
                         logging.debug("_remote_sock relay decrypted >> %d %s" % (len(data), data))
 
-                    # # logging.debug("data           >> %d %s" % (len(data), data))
-                    # try:
-                    #     # logging.debug(self._obfss)
-                    #     obfs_decode = self._obfss[self._current_user_id].client_decode(data)
-                    # except Exception as e:
-                    #     shell.print_exception(e)
-                    #     logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
-                    #     self.destroy()
-                    #     return
-                    # # logging.debug("data           >> %d %s" % (len(data), data))
-                    # if obfs_decode[1]:
-                    #     send_back = self._obfs.client_encode(b'')
-                    #     self._write_to_sock(send_back, self._remote_sock)
-                    # if not self._protocols[self._current_user_id].obfs.server_info.recv_iv:
-                    #     iv_len = len(self._protocols[self._current_user_id].obfs.server_info.iv)
-                    #     self._protocols[self._current_user_id].obfs.server_info.recv_iv = obfs_decode[0][:iv_len]
-                    # data = obfs_decode[0]
-                    # logging.debug("data           >> %d %s" % (len(data), data))
-                    # data = self._encryptors[self._current_user_id].decrypt(data)
-                    # logging.debug("data decrypted >> %d %s" % (len(data), data))
-                    # try:
-                    #     data = self._protocols[self._current_user_id].client_post_decrypt(data)
-                    #     if self._recv_pack_id == 1:
-                    #         self._tcp_mss = self._protocols[self._current_user_id].get_server_info().tcp_mss
-                    # except Exception as e:
-                    #     shell.print_exception(e)
-                    #     logging.error("exception from %s:%d" % (self._client_address[0], self._client_address[1]))
-                    #     self.destroy()
-                    #     return
-                    # logging.debug("_remote_sock relay_data decrypted >> %d %s" % (len(data), data))
-
-
-                    
                     data = self._protocol.server_pre_encrypt(data)
                     data = self._encryptor.encrypt(data)
                     data = self._obfs.server_encode(data)

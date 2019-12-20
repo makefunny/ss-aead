@@ -151,6 +151,24 @@ class DbTransfer(object):
                 return ret
             if fetchall is True and fetchone is False:
                 return {}
+        except ConnectionAbortedError as e:
+            logging.error(e)
+            logging.error(query_sql)
+            print(isinstance(e, ConnectionAbortedError))
+            # print(e.errmsg, type(e.errmsg), isinstance(e.errmsg, BrokenPipeError))
+            # print(e, type(e), isinstance(e, ConnectionAbortedError), isinstance(e.errmsg, ConnectionAbortedError))
+
+            self.waitForMysqlConnectable()
+            time.sleep(self.mysql_err_sleep)
+            self.mysql_err_sleep += 10
+
+            if cur:
+                cur.close()
+            return self.getMysqlCur(
+                query_sql,
+                fetchone=fetchone,
+                fetchall=fetchall,
+                no_result=no_result)
         except Exception as e:
             logging.error(e)
             logging.error(query_sql)
