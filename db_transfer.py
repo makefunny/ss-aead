@@ -155,7 +155,7 @@ class DbTransfer(object):
             logging.error(e)
             logging.error(query_sql)
             # print(e.errmsg, type(e.errmsg), isinstance(e.errmsg, BrokenPipeError))
-            print(e, type(e), isinstance(e, ConnectionAbortedError), isinstance(e.errmsg, ConnectionAbortedError))
+            # print(e, type(e), isinstance(e, ConnectionAbortedError), isinstance(e.errmsg, ConnectionAbortedError))
 
             # BrokenPipeError 无法直接catch
             if isinstance(e.errmsg, BrokenPipeError) or isinstance(e.errmsg, ConnectionAbortedError):
@@ -1178,7 +1178,7 @@ class DbTransfer(object):
                 # waiting for stop signal
                 # stop => signal is True
                 # continue => signal is False
-                if db_instance.event.wait(6) or not db_instance.is_all_thread_alive():
+                if db_instance.event.wait(60) or not db_instance.is_all_thread_alive():
                     break
                 # logging.info('if db_instance.has_stopped:')
                 if db_instance.has_stopped:
