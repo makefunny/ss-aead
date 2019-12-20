@@ -154,9 +154,7 @@ class DbTransfer(object):
         except ConnectionAbortedError as e:
             logging.error(e)
             logging.error(query_sql)
-            print(isinstance(e, ConnectionAbortedError))
-            # print(e.errmsg, type(e.errmsg), isinstance(e.errmsg, BrokenPipeError))
-            # print(e, type(e), isinstance(e, ConnectionAbortedError), isinstance(e.errmsg, ConnectionAbortedError))
+            # print(isinstance(e, ConnectionAbortedError))
 
             self.waitForMysqlConnectable()
             time.sleep(self.mysql_err_sleep)
@@ -172,26 +170,37 @@ class DbTransfer(object):
         except Exception as e:
             logging.error(e)
             logging.error(query_sql)
-            # print(e.errmsg, type(e.errmsg), isinstance(e.errmsg, BrokenPipeError)) 
-            # print(e, type(e), isinstance(e, ConnectionAbortedError), isinstance(e.errmsg, ConnectionAbortedError))
 
             # BrokenPipeError 无法直接catch
-            if isinstance(e.errmsg, BrokenPipeError) or isinstance(e.errmsg, ConnectionAbortedError):
-                self.waitForMysqlConnectable()
-                time.sleep(self.mysql_err_sleep)
-                self.closeMysqlConn()
+            if hasattr(e, 'errmsg'):
+                """
+                print(
+                    e.errmsg,
+                    type(e.errmsg),
+                    isinstance(e.errmsg, BrokenPipeError))
+                print(
+                    e,
+                    type(e),
+                    isinstance(e, ConnectionAbortedError),
+                    isinstance(e.errmsg, ConnectionAbortedError))
+                """
+                if isinstance(e.errmsg, BrokenPipeError) or \
+                    isinstance(e.errmsg, ConnectionAbortedError):
+                    self.waitForMysqlConnectable()
+                    time.sleep(self.mysql_err_sleep)
+                    self.closeMysqlConn()
 
-                if cur:
-                    cur.close()
-                return self.getMysqlCur(
-                    query_sql,
-                    fetchone=fetchone,
-                    fetchall=fetchall,
-                    no_result=no_result)
+                    if cur:
+                        cur.close()
+                    return self.getMysqlCur(
+                        query_sql,
+                        fetchone=fetchone,
+                        fetchall=fetchall,
+                        no_result=no_result)
 
             self.waitForMysqlConnectable()
             time.sleep(self.mysql_err_sleep)
-            self.mysql_err_sleep += 10
+            # self.mysql_err_sleep += 10
 
             if cur:
                 cur.close()
@@ -1196,7 +1205,7 @@ class DbTransfer(object):
                 # waiting for stop signal
                 # stop => signal is True
                 # continue => signal is False
-                if db_instance.event.wait(60) or not db_instance.is_all_thread_alive():
+                if db_instance.event.wait(6) or not db_instance.is_all_thread_alive():
                     break
                 # logging.info('if db_instance.has_stopped:')
                 if db_instance.has_stopped:
