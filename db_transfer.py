@@ -154,7 +154,7 @@ class DbTransfer(object):
         except Exception as e:
             logging.error(e)
             logging.error(query_sql)
-            # print(e.errmsg, type(e.errmsg), isinstance(e.errmsg, BrokenPipeError))
+            # print(e.errmsg, type(e.errmsg), isinstance(e.errmsg, BrokenPipeError)) 
             # print(e, type(e), isinstance(e, ConnectionAbortedError), isinstance(e.errmsg, ConnectionAbortedError))
 
             # BrokenPipeError 无法直接catch
