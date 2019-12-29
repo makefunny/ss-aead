@@ -63,6 +63,12 @@ class DbTransfer(object):
 
         self.enable_dnsLog = True
 
+        self.traffic_log_to_insert = ""
+        self.traffic_log_query_head = "INSERT INTO `user_traffic_log` (`id`, `user_id`, `u`, `d`, `node_id`, `rate`, `traffic`, `log_time`) VALUES "
+
+        self.alive_ip_to_insert = ""
+        self.alive_ip_query_head = "INSERT INTO `alive_ip` (`id`, `nodeid`,`userid`, `ip`, `datetime`) VALUES "
+
         self.MYSQL_HOST = get_config().MYSQL_HOST
         self.MYSQL_PORT = get_config().MYSQL_PORT
         self.MYSQL_USER = get_config().MYSQL_USER
@@ -214,26 +220,44 @@ class DbTransfer(object):
                 no_result=no_result)
         return None
 
-    def mass_insert_traffic(self, pid, dt_transfer):
+    def append_traffic_log(self, pid, dt_transfer):
         traffic_show = G_traffic_show(
             (dt_transfer[pid][0] + dt_transfer[pid][1]) * self.traffic_rate)
-        query_sql = "INSERT INTO `user_traffic_log` (`id`, `user_id`, `u`, `d`, `Node_ID`, `rate`, `traffic`, `log_time`) VALUES (NULL, '" + \
-                    str(self.port_uid_table[pid]) + \
-                    "', '" + \
-                    str(dt_transfer[pid][0]) + \
-                    "', '" + \
-                    str(dt_transfer[pid][1]) + \
-                    "', '" + \
-                    str(self.NODE_ID) + \
-                    "', '" + \
-                    str(self.traffic_rate) + \
-                    "', '" + \
-                    traffic_show + \
-                    "', unix_timestamp());"
-        self.getMysqlCur(query_sql, no_result=True)
+        if self.traffic_log_to_insert:
+            self.traffic_log_to_insert += ","
+        self.traffic_log_to_insert += "(NULL, '" + \
+                str(self.port_uid_table[pid]) + \
+                "', '" + \
+                str(dt_transfer[pid][0]) + \
+                "', '" + \
+                str(dt_transfer[pid][1]) + \
+                "', '" + \
+                str(self.NODE_ID) + \
+                "', '" + \
+                str(self.traffic_rate) + \
+                "', '" + \
+                traffic_show + \
+                "', unix_timestamp())"
+
+    def mass_insert_traffic(self):
+        if self.traffic_log_to_insert:
+            query_sql = self.traffic_log_query_head + self.traffic_log_to_insert + ";"
+            self.getMysqlCur(query_sql, no_result=True)
+            self.traffic_log_to_insert = ""
+
+    def append_alive_ip(self, pid, ip):
+        if self.alive_ip_to_insert:
+            self.alive_ip_to_insert += ","
+        self.alive_ip_to_insert += "(NULL, '" + \
+            str(self.NODE_ID) + "','" + str(self.port_uid_table[pid]) + "', '" + str(ip) + "', unix_timestamp())"
+
+    def mass_insert_alive_ip(self):
+        if self.alive_ip_to_insert:
+            query_sql = self.alive_ip_query_head + self.alive_ip_to_insert + ";"
+            self.getMysqlCur(query_sql, no_result=True)
+            self.alive_ip_to_insert = ""
 
     def update_all_user(self, dt_transfer):
-        self.closeMysqlConn()
         update_transfer = {}
 
         # 同一用户可有多个产品，故以产品id为线索更新流量
@@ -265,7 +289,7 @@ class DbTransfer(object):
 
             alive_user_count = alive_user_count + 1
 
-            self.mass_insert_traffic(id, dt_transfer)
+            self.append_traffic_log(id, dt_transfer)
 
             bandwidth_thistime = bandwidth_thistime + \
                 (dt_transfer[id][0] + dt_transfer[id][1])
@@ -274,6 +298,8 @@ class DbTransfer(object):
                 query_sub_in += ',%s' % self.uid_productid_table[self.port_uid_table[id]]
             else:
                 query_sub_in = '%s' % self.uid_productid_table[self.port_uid_table[id]]
+        self.mass_insert_traffic()
+
         if query_sub_when != '':
             query_sql = query_head + ' SET traffic_flow_used_up = CASE id' + query_sub_when + \
                 ' END, traffic_flow_used_dl = CASE id' + query_sub_when2 + \
@@ -292,11 +318,10 @@ class DbTransfer(object):
         self.getMysqlCur(query_sql, no_result=True)
 
         online_iplist = ServerPool.get_instance().get_servers_iplist()
-        for id in online_iplist.keys():
-            for ip in online_iplist[id]:
-                query_sql = "INSERT INTO `alive_ip` (`id`, `nodeid`,`userid`, `ip`, `datetime`) VALUES (NULL, '" + \
-                    str(self.NODE_ID) + "','" + str(self.port_uid_table[id]) + "', '" + str(ip) + "', unix_timestamp())"
-                self.getMysqlCur(query_sql, no_result=True)
+        for pid in online_iplist.keys():
+            for ip in online_iplist[pid]:
+                self.append_alive_ip(pid, ip)
+        self.mass_insert_alive_ip()
 
         detect_log_list = ServerPool.get_instance().get_servers_detect_log()
         for port in detect_log_list.keys():
@@ -342,7 +367,7 @@ class DbTransfer(object):
 
                     if rows is not None:
                         continue
-                    if get_config().CLOUDSAFE == 1:
+                    if self.CLOUDSAFE == 1:
                         query_sql = "INSERT INTO `blockip` (`id`, `nodeid`, `ip`, `datetime`) VALUES (NULL, '" + \
                             str(self.NODE_ID) + \
                             "', '" + \
