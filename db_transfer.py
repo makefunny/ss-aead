@@ -1209,8 +1209,7 @@ class DbTransfer(object):
             import resource
             logging.info(
                 'current process RLIMIT_NOFILE resource: soft %d hard %d' %
-                resource.getrlimit(
-                    resource.RLIMIT_NOFILE))
+                resource.getrlimit(resource.RLIMIT_NOFILE))
         except:
             pass
         try:
