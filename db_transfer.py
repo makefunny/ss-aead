@@ -821,7 +821,6 @@ class DbTransfer(object):
                 d['des_obfs'] = str(r[9])
                 d['des_obfs_param'] = str(r[10])
                 self.relay_rule_list[d['id']] = d
-
             # cur.close()
 
         return rows
