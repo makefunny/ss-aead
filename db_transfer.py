@@ -94,7 +94,8 @@ class DbTransfer(object):
                 ssl={
                     'ca': self.MYSQL_SSL_CA,
                     'cert': self.MYSQL_SSL_CERT,
-                    'key': self.MYSQL_SSL_KEY})
+                    'key': self.MYSQL_SSL_KEY},
+                connect_timeout=120)
         else:
             conn = cymysql.connect(
                 host=self.MYSQL_HOST,
@@ -102,7 +103,8 @@ class DbTransfer(object):
                 user=self.MYSQL_USER,
                 passwd=self.MYSQL_PASS,
                 db=self.MYSQL_DB,
-                charset='utf8')
+                charset='utf8',
+                connect_timeout=120)
         conn.autocommit(True)
         return conn
 

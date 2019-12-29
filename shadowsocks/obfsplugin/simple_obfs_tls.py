@@ -67,6 +67,13 @@ class simple_obfs_tls(plain.plain):
         self.tls_version = b'\x03\x03'
         self.overhead = 5
 
+    def next_obfs_stage(self):
+        self.obfs_stage += 1
+        logging.debug("self.obfs_stage >> %d" % self.obfs_stage)
+
+    def next_deobfs_stage(self):
+        self.obfs_stage += 1
+
     def init_data(self):
         return obfs_auth_data()
 
@@ -88,14 +95,15 @@ class simple_obfs_tls(plain.plain):
     def client_encode(self, buf):
         # why ?
         # raise Exception('Need to finish')
+        logging.debug("self.obfs_stage >> %d" % self.obfs_stage)
         if self.obfs_stage == -1:
             return buf
         if self.obfs_stage == 1:
-            self.obfs_stage += 1
+            self.next_obfs_stage()
             ret = b"\x17" + self.tls_version + struct.pack('>H', len(buf)) + buf
             return ret
         if self.obfs_stage == 0:
-            self.obfs_stage += 1
+            self.next_obfs_stage()
             data = self.tls_version + self.pack_auth_data(self.server_info.data.client_id) + b"\x20" + self.server_info.data.client_id + binascii.unhexlify(b"001cc02bc02fcca9cca8cc14cc13c00ac014c009c013009c0035002f000a" + b"0100")
             ext = binascii.unhexlify(b"ff01000100")
             host = self.server_info.obfs_param or self.server_info.host

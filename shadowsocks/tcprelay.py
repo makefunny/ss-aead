@@ -953,21 +953,7 @@ class TCPRelayHandler(object):
                     common.to_str(remote_addr), remote_port,
                     self._client_address[0], self._client_address[1],
                     self._server._listen_port))
-            # if connecttype != 0:
-            #     pass
-            #     #common.connect_log('UDP over TCP by user %d' %
-            #     #        (self._user_id, ))
-            # else:
-            #     common.connect_log(
-            #         '%s connecting %s:%d from %s:%d via port %d,hex data : %s' %
-            #         (
-            #             (connecttype == 0) and 'TCP' or 'UDP',
-            #             common.to_str(remote_addr), remote_port,
-            #             self._client_address[0], self._client_address[1],
-            #             self._server._listen_port,
-            #             binascii.hexlify(data)
-            #         )
-            #     )
+
             if not is_error:
                 if not self._server.is_pushing_detect_text_list_all:
                     for id in self._server.detect_text_list_all:
@@ -1021,9 +1007,11 @@ class TCPRelayHandler(object):
             self._update_stream(STREAM_UP, WAIT_STATUS_WRITING)
             self._stage = STAGE_DNS
             if self._is_local:
+                data_to_local = b'\x05\x00\x00\x01\x00\x00\x00\x00\x10\x10'
+                logging.debug("data to local   >> %d %s" % (len(data_to_local), data_to_local))
+                self._write_to_sock(data_to_local, self._local_sock)
+
                 # forward address to remote
-                self._write_to_sock((b'\x05\x00\x00\x01'
-                                     b'\x00\x00\x00\x00\x10\x10'), self._local_sock)
                 head_len = self._get_head_size(data, 30)
                 logging.debug("head_len >> %d" % head_len)
                 self._obfs.obfs.server_info.head_len = head_len
@@ -1716,7 +1704,7 @@ class TCPRelayHandler(object):
             self.destroy()
         # logging.debug(">> \ndata     >> %s" % data)
         # logging.debug(">> \ndata     >> %s\nogn_data >> %s" % (data, ogn_data))
-        logging.debug("self._stage    >> %d" % self._stage)
+        self._print_stage()
         logging.debug("self._is_local >> %d" % self._is_local)
         logging.debug("self._is_relay >> %d" % self._is_relay)
         logging.debug('data           >> %d %s' % (len(data), data))
@@ -1740,7 +1728,9 @@ class TCPRelayHandler(object):
         # stage 0
         elif is_local and self._stage == STAGE_INIT:
             # TODO check auth method
-            self._write_to_sock(b'\x05\00', self._local_sock)
+            data = b'\x05\00'
+            logging.debug('data to local  >> %d %s' % (len(data), data))
+            self._write_to_sock(data, self._local_sock)
             self._stage = STAGE_ADDR
         # stage 4
         elif self._stage == STAGE_CONNECTING:
@@ -2102,6 +2092,24 @@ class TCPRelayHandler(object):
 
     def _log_error(self, e):
         logging.error('%s when handling connection from %s:%d' % (e, self._client_address[0], self._client_address[1]))
+
+    def _print_stage(self):
+        if self._stage == 0:
+            stage_str = "STAGE_INIT"
+        elif self._stage == 1:
+            stage_str = "STAGE_ADDR"
+        elif self._stage == 2:
+            stage_str = "STAGE_UDP_ASSOC"
+        elif self._stage == 3:
+            stage_str = "STAGE_DNS"
+        elif self._stage == 4:
+            stage_str = "STAGE_CONNECTING"
+        elif self._stage == 5:
+            stage_str = "STAGE_STREAM"
+        elif self._stage == -1:
+            stage_str = "STAGE_DESTROYED"
+        if stage_str:
+            logging.debug("self.stage >> %d >> %s" % (self._stage, stage_str))
 
     def stage(self):
         return self._stage

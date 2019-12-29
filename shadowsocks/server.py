@@ -126,6 +126,8 @@ def main():
                 a_config['detect_hex_list_dns']     = {}
                 a_config['detect_text_list_dns']    = {}
                 a_config["is_multi_user"]           = 0
+                a_config["relay_type"] = 0
+                a_config["common_relay_rule"] = {}
 
                 logging.info("starting server at [%s]:%d" %
                              (a_config['server'], int(port)))
@@ -164,6 +166,8 @@ def main():
             a_config['detect_hex_list_dns'] = {}
             a_config['detect_text_list_dns'] = {}
             a_config["is_multi_user"] = 0
+            a_config["relay_type"] = 0
+            a_config["common_relay_rule"] = {}
 
             logging.info("starting server at %s:%d" % (a_config['server'], int(port)))
             tcp_servers.append(

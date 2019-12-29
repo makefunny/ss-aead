@@ -51,6 +51,8 @@ def main():
     config['detect_hex_list_dns'] = {}
     config['detect_text_list_dns'] = {}
     config["is_multi_user"] = 0
+    config["relay_type"] = 0
+    config["common_relay_rule"] = {}
 
     if not config.get('dns_ipv6', False):
         asyncdns.IPV6_CONNECTION_SUPPORT = False
