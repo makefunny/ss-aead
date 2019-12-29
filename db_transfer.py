@@ -187,7 +187,8 @@ class DbTransfer(object):
                     isinstance(e.errmsg, ConnectionAbortedError))
                 """
                 if isinstance(e.errmsg, BrokenPipeError) or \
-                    isinstance(e.errmsg, ConnectionAbortedError):
+                    isinstance(e.errmsg, ConnectionAbortedError) or \
+                    isinstance(e.errmsg, BlockingIOError):
                     self.waitForMysqlConnectable()
                     time.sleep(self.mysql_err_sleep)
                     self.closeMysqlConn()
